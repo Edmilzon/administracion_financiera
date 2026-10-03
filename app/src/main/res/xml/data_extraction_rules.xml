@@ -6,8 +6,12 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="finance_remote_auth.xml" />
+        <exclude domain="sharedpref" path="finance_room_key_wrappers.xml" />
+        <exclude domain="database" path="." />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="finance_remote_auth.xml" />
+        <exclude domain="sharedpref" path="finance_room_key_wrappers.xml" />
+        <exclude domain="database" path="." />
     </device-transfer>
 </data-extraction-rules>

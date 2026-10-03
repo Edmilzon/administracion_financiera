@@ -11,3 +11,7 @@ Las migraciones versionadas de la base se mantienen en `database/migrations/`. N
 5. La primera cuenta crea el espacio y queda como administradora. Desde allí crea las cuentas adicionales y asigna roles.
 
 La eliminación de un integrante quita su pertenencia al espacio; no borra su identidad de Neon Auth. Las políticas de las tablas financieras futuras deberán comprobar que el usuario sigue perteneciendo al espacio.
+
+## Segunda migración: categorías y movimientos
+
+Después de `001_household_access.sql`, ejecutar `migrations/002_financial_records.sql`. Crea las categorías iniciales y las tablas de movimientos, y aplica RLS para que solo administradores gestionen categorías, administradores lean los movimientos del espacio y cada integrante inserte/edite/elimine solo los propios. Esta migración está versionada, pero aún no se ha ejecutado porque la rama Neon y sus endpoints siguen pendientes de configuración.

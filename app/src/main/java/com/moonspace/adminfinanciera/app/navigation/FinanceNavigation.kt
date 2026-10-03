@@ -23,6 +23,8 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
 import com.moonspace.adminfinanciera.feature.auth.presentation.AuthViewModel
 import com.moonspace.adminfinanciera.feature.auth.presentation.LoginScreen
 import com.moonspace.adminfinanciera.feature.dashboard.presentation.DashboardScreen
+import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsScreen
+import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsViewModel
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersScreen
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersViewModel
 
@@ -49,17 +51,30 @@ fun FinanceNavigation() {
             }
         )
         val membersState by membersViewModel.uiState.collectAsStateWithLifecycle()
-        var isShowingMembers by rememberSaveable(user.id) { mutableStateOf(false) }
+        val transactionsViewModel: FinanceTransactionsViewModel = viewModel(
+            factory = remember(container) {
+                FinanceTransactionsViewModel.Factory(
+                    context,
+                    container.householdMembersRepository,
+                    container.financialRepository
+                )
+            }
+        )
+        val transactionsState by transactionsViewModel.uiState.collectAsStateWithLifecycle()
+        var destination by rememberSaveable(user.id) { mutableStateOf("dashboard") }
 
-        LaunchedEffect(user.id, isShowingMembers) {
-            if (isShowingMembers) membersViewModel.load(user)
+        LaunchedEffect(user.id, destination) {
+            when (destination) {
+                DESTINATION_USERS -> membersViewModel.load(user)
+                DESTINATION_TRANSACTIONS -> transactionsViewModel.load(user)
+            }
         }
 
-        if (isShowingMembers) {
+        if (destination == DESTINATION_USERS) {
             HouseholdMembersScreen(
                 user = user,
                 state = membersState,
-                onBack = { isShowingMembers = false },
+                onBack = { destination = DESTINATION_DASHBOARD },
                 onRefresh = { membersViewModel.load(user) },
                 onCreateHousehold = { membersViewModel.createHousehold(user, it) },
                 onCreateMember = { email, password, role ->
@@ -68,12 +83,30 @@ fun FinanceNavigation() {
                 onUpdateRole = { userId, role -> membersViewModel.updateRole(user, userId, role) },
                 onRemoveMember = { userId -> membersViewModel.removeMember(user, userId) }
             )
+        } else if (destination == DESTINATION_TRANSACTIONS) {
+            FinanceTransactionsScreen(
+                user = user,
+                state = transactionsState,
+                onBack = { destination = DESTINATION_DASHBOARD },
+                onOpenUsers = { destination = DESTINATION_USERS },
+                onRefresh = { transactionsViewModel.load(user) },
+                onSaveTransaction = transactionsViewModel::saveTransaction,
+                onDeleteTransaction = transactionsViewModel::deleteTransaction,
+                onSaveCategory = transactionsViewModel::saveCategory,
+                onDeactivateCategory = transactionsViewModel::deactivateCategory,
+                onClearMessages = transactionsViewModel::clearMessages
+            )
         } else {
             DashboardScreen(
                 user = user,
                 isSigningOut = uiState.isSubmitting,
-                onSignOut = authViewModel::signOut,
-                onOpenUsers = { isShowingMembers = true }
+                onSignOut = {
+                    transactionsViewModel.clearAccountContext()
+                    container.closeFinancialDatabases()
+                    authViewModel.signOut()
+                },
+                onOpenUsers = { destination = DESTINATION_USERS },
+                onOpenTransactions = { destination = DESTINATION_TRANSACTIONS }
             )
         }
     } else {
@@ -87,6 +120,10 @@ fun FinanceNavigation() {
         )
     }
 }
+
+private const val DESTINATION_DASHBOARD = "dashboard"
+private const val DESTINATION_USERS = "users"
+private const val DESTINATION_TRANSACTIONS = "transactions"
 
 @Composable
 private fun SessionLoadingScreen() {

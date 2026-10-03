@@ -7,4 +7,6 @@
 -->
 <full-backup-content>
     <exclude domain="sharedpref" path="finance_remote_auth.xml" />
+    <exclude domain="sharedpref" path="finance_room_key_wrappers.xml" />
+    <exclude domain="database" path="." />
 </full-backup-content>

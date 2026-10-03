@@ -2,14 +2,18 @@ package com.moonspace.adminfinanciera.app.di
 
 import android.content.Context
 import com.moonspace.adminfinanciera.BuildConfig
+import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
 import com.moonspace.adminfinanciera.feature.auth.data.NeonAuthRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
 import com.moonspace.adminfinanciera.feature.users.data.NeonHouseholdMembersRepository
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdMembersRepository
+import com.moonspace.adminfinanciera.feature.transactions.data.RoomFinancialRepository
+import com.moonspace.adminfinanciera.feature.transactions.domain.FinancialRepository
 
 class FinanceAppContainer(context: Context) {
+    val financeDatabases = EncryptedFinanceDatabaseProvider(context.applicationContext)
     val neonApiConfig = NeonApiConfig(
         authBaseUrl = BuildConfig.NEON_AUTH_BASE_URL,
         dataApiBaseUrl = BuildConfig.NEON_DATA_API_URL
@@ -21,6 +25,10 @@ class FinanceAppContainer(context: Context) {
         context = context.applicationContext,
         config = neonApiConfig,
         dataApiClient = dataApiClient,
-        authRepository = authRepository
+        authRepository = authRepository,
+        databases = financeDatabases
     )
+    val financialRepository: FinancialRepository = RoomFinancialRepository(financeDatabases)
+
+    fun closeFinancialDatabases() = financeDatabases.closeAll()
 }

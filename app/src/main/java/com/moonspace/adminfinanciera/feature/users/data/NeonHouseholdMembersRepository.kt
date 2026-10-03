@@ -1,6 +1,10 @@
 package com.moonspace.adminfinanciera.feature.users.data
 
 import android.content.Context
+import androidx.room.withTransaction
+import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
+import com.moonspace.adminfinanciera.core.database.HouseholdCacheEntity
+import com.moonspace.adminfinanciera.core.database.HouseholdMemberCacheEntity
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
@@ -23,11 +27,58 @@ class NeonHouseholdMembersRepository(
     context: Context,
     private val config: NeonApiConfig,
     private val dataApiClient: NeonDataApiClient,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val databases: EncryptedFinanceDatabaseProvider
 ) : HouseholdMembersRepository {
     private val appContext = context.applicationContext
 
     override suspend fun load(currentUser: AuthUser): HouseholdSnapshot {
+        val database = databases.databaseFor(currentUser.id)
+        val cached = readCachedSnapshot(currentUser.id)
+        if (!config.isDataApiConfigured) {
+            return cached ?: HouseholdSnapshot(null, null, emptyList())
+        }
+
+        val snapshot = try {
+            loadRemote(currentUser)
+        } catch (error: UserManagementException) {
+            if (error.cause is IOException && cached != null) return cached
+            throw error
+        }
+
+        val previous = database.householdCacheDao().getHousehold(currentUser.id)
+        database.withTransaction {
+            if (previous?.householdId != null && previous.householdId != snapshot.householdId) {
+                database.transactionDao().deleteForHousehold(previous.householdId)
+                database.categoryDao().deleteForHousehold(previous.householdId)
+                database.syncOutboxDao().clearAccount(currentUser.id)
+                database.transactionDeletionMarkerDao().clearAll()
+            }
+            database.householdCacheDao().saveSnapshot(
+                household = HouseholdCacheEntity(
+                    accountId = currentUser.id,
+                    householdId = snapshot.householdId,
+                    currentUserRole = snapshot.currentUserRole?.apiValue,
+                    updatedAt = System.currentTimeMillis()
+                ),
+                members = snapshot.members.map { member ->
+                    HouseholdMemberCacheEntity(
+                        accountId = currentUser.id,
+                        householdId = requireNotNull(snapshot.householdId),
+                        userId = member.userId,
+                        email = member.email,
+                        role = member.role.apiValue
+                    )
+                }
+            )
+            if (snapshot.currentUserRole == HouseholdRole.Member && snapshot.householdId != null) {
+                database.transactionDao().removeOthers(snapshot.householdId, currentUser.id)
+            }
+        }
+        return snapshot
+    }
+
+    private suspend fun loadRemote(currentUser: AuthUser): HouseholdSnapshot {
         requireDataApi()
         val ownRows = request(
             resource = "household_members",
@@ -63,6 +114,17 @@ class NeonHouseholdMembersRepository(
         ).toRows().map { it.toHouseholdMember() }
 
         return HouseholdSnapshot(householdId, currentRole, members)
+    }
+
+    private suspend fun readCachedSnapshot(accountId: String): HouseholdSnapshot? {
+        val database = databases.databaseFor(accountId)
+        val cached = database.householdCacheDao().getHousehold(accountId) ?: return null
+        val role = cached.currentUserRole?.let(HouseholdRole::fromApiValue)
+        val members = database.householdCacheDao().getMembers(accountId).mapNotNull { member ->
+            val memberRole = HouseholdRole.fromApiValue(member.role) ?: return@mapNotNull null
+            HouseholdMember(member.userId, member.email, memberRole)
+        }
+        return HouseholdSnapshot(cached.householdId, role, members)
     }
 
     override suspend fun createHousehold(currentUser: AuthUser, name: String) {
@@ -151,8 +213,8 @@ class NeonHouseholdMembersRepository(
             dataApiClient.request(resource, method, query, body)
         } catch (_: IllegalStateException) {
             fail(R.string.auth_data_api_missing)
-        } catch (_: IOException) {
-            fail(R.string.users_connection_failed)
+        } catch (error: IOException) {
+            throw UserManagementException(appContext.getString(R.string.users_connection_failed), error)
         } catch (_: Exception) {
             fail(R.string.users_request_failed)
         }

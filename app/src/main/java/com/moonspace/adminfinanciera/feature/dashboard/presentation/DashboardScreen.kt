@@ -35,7 +35,8 @@ fun DashboardScreen(
     user: AuthUser,
     isSigningOut: Boolean,
     onSignOut: () -> Unit,
-    onOpenUsers: () -> Unit
+    onOpenUsers: () -> Unit,
+    onOpenTransactions: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -113,7 +114,8 @@ fun DashboardScreen(
             MenuTile(
                 number = "01",
                 title = stringResource(R.string.menu_transactions),
-                description = stringResource(R.string.menu_transactions_description)
+                description = stringResource(R.string.menu_transactions_description),
+                onClick = onOpenTransactions
             )
             MenuTile(
                 number = "02",
