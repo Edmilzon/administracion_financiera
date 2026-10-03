@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,7 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceEmptyState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceErrorState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceListRow
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
+import com.moonspace.adminfinanciera.core.ui.components.FinanceSectionHeader
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceBottomSheet
@@ -52,10 +54,15 @@ import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 import com.moonspace.adminfinanciera.feature.transactions.domain.CategoryDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceCategory
+import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceMemberTotal
+import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceTransactionReport
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceTransaction
 import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionKind
+import com.moonspace.adminfinanciera.feature.transactions.domain.buildFinanceTransactionReport
+import com.moonspace.adminfinanciera.feature.transactions.domain.filterFinanceTransactions
 import java.math.BigDecimal
+import java.math.BigInteger
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Currency
@@ -75,8 +82,28 @@ fun FinanceTransactionsScreen(
     onDeleteTransaction: (String) -> Unit,
     onSaveCategory: (CategoryDraft) -> Unit,
     onDeactivateCategory: (String) -> Unit,
+    onSelectMonth: (String?) -> Unit,
+    onSelectKind: (TransactionKind?) -> Unit,
+    onSelectMember: (String?) -> Unit,
+    onClearFilters: () -> Unit,
     onClearMessages: () -> Unit
 ) {
+    val filteredTransactions = remember(
+        state.transactions,
+        state.selectedMonthKey,
+        state.selectedKind,
+        state.selectedMemberId
+    ) {
+        filterFinanceTransactions(
+            state.transactions,
+            state.selectedMonthKey,
+            state.selectedKind,
+            state.selectedMemberId
+        )
+    }
+    val report = remember(filteredTransactions, state.memberEmails) {
+        buildFinanceTransactionReport(filteredTransactions, state.memberEmails)
+    }
     var isShowingEditor by rememberSaveable { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<FinanceTransaction?>(null) }
     var transactionToDelete by remember { mutableStateOf<FinanceTransaction?>(null) }
@@ -176,19 +203,91 @@ fun FinanceTransactionsScreen(
                     }
                 }
 
-                if (state.transactions.isEmpty()) {
-                    FinanceEmptyState(
-                        title = stringResource(R.string.transactions_empty_title),
-                        description = stringResource(R.string.transactions_empty_description),
-                        modifier = Modifier.weight(1f)
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
-                        contentPadding = PaddingValues(bottom = FinanceSpacing.Large)
-                    ) {
-                        items(state.transactions, key = FinanceTransaction::id) { transaction ->
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
+                    contentPadding = PaddingValues(bottom = FinanceSpacing.Large)
+                ) {
+                    item(key = "transaction_filters") {
+                        TransactionFilterPanel(
+                            monthKeys = state.availableMonthKeys,
+                            selectedMonthKey = state.selectedMonthKey,
+                            selectedKind = state.selectedKind,
+                            selectedMemberId = state.selectedMemberId,
+                            memberEmails = state.memberEmails,
+                            currentUserId = user.id,
+                            canFilterMembers = state.canManageCategories,
+                            hasActiveFilters = state.hasActiveFilters,
+                            onSelectMonth = onSelectMonth,
+                            onSelectKind = onSelectKind,
+                            onSelectMember = onSelectMember,
+                            onClearFilters = onClearFilters
+                        )
+                    }
+                    item(key = "transaction_summary") {
+                        TransactionSummaryCard(report, state.selectedMonthKey)
+                    }
+                    if (report.categoryTotals.isNotEmpty()) {
+                        item(key = "category_breakdown_header") {
+                            FinanceSectionHeader(stringResource(R.string.transactions_category_breakdown))
+                        }
+                        items(
+                            items = report.categoryTotals,
+                            key = { "${it.kind.apiValue}:${it.categoryId}" }
+                        ) { total ->
+                            FinanceListRow(
+                                title = total.categoryName,
+                                supportingText = kindLabel(total.kind),
+                                trailingContent = {
+                                    FinanceAmountText(
+                                        formattedAmount = formatBobs(total.amountCentavos),
+                                        kind = total.kind.toAmountKind(),
+                                        accessibilityLabel = "${kindLabel(total.kind)} ${total.categoryName}: ${formatBobs(total.amountCentavos)}"
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    if (state.canManageCategories && report.memberTotals.isNotEmpty()) {
+                        item(key = "member_breakdown_header") {
+                            FinanceSectionHeader(stringResource(R.string.transactions_member_breakdown))
+                        }
+                        items(report.memberTotals, key = FinanceMemberTotal::userId) { total ->
+                            MemberBreakdownCard(
+                                total = total,
+                                currentUserId = user.id
+                            )
+                        }
+                    }
+                    item(key = "transaction_list_header") {
+                        FinanceSectionHeader(
+                            title = stringResource(R.string.transactions_list_title),
+                            supportingText = pluralStringResource(
+                                R.plurals.transactions_results_count,
+                                filteredTransactions.size,
+                                filteredTransactions.size
+                            )
+                        )
+                    }
+                    if (filteredTransactions.isEmpty()) {
+                        item(key = "transaction_empty_state") {
+                            FinanceEmptyState(
+                                title = stringResource(
+                                    if (state.transactions.isEmpty()) R.string.transactions_empty_title
+                                    else R.string.transactions_no_filter_results_title
+                                ),
+                                description = stringResource(
+                                    if (state.transactions.isEmpty()) R.string.transactions_empty_description
+                                    else R.string.transactions_no_filter_results_description
+                                ),
+                                actionLabel = if (state.hasActiveFilters) {
+                                    stringResource(R.string.transactions_clear_filters)
+                                } else null,
+                                onAction = if (state.hasActiveFilters) onClearFilters else null
+                            )
+                        }
+                    } else {
+                        items(filteredTransactions, key = FinanceTransaction::id) { transaction ->
                             val isOwn = transaction.createdBy == user.id
                             val author = if (isOwn) {
                                 stringResource(R.string.transactions_registered_by_you)
@@ -260,6 +359,219 @@ fun FinanceTransactionsScreen(
             isProcessing = state.isSubmitting,
             processingLabel = stringResource(R.string.transactions_deleting)
         )
+    }
+}
+
+private data class FinanceFilterOption(val key: String?, val label: String)
+
+@Composable
+private fun TransactionFilterPanel(
+    monthKeys: List<String>,
+    selectedMonthKey: String?,
+    selectedKind: TransactionKind?,
+    selectedMemberId: String?,
+    memberEmails: Map<String, String>,
+    currentUserId: String,
+    canFilterMembers: Boolean,
+    hasActiveFilters: Boolean,
+    onSelectMonth: (String?) -> Unit,
+    onSelectKind: (TransactionKind?) -> Unit,
+    onSelectMember: (String?) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    val monthOptions = listOf(
+        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_months))
+    ) + monthKeys.map { FinanceFilterOption(it, formatMonthLabel(it)) }
+    val kindOptions = listOf(
+        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_types)),
+        FinanceFilterOption(TransactionKind.Income.apiValue, stringResource(R.string.transactions_filter_income)),
+        FinanceFilterOption(TransactionKind.Expense.apiValue, stringResource(R.string.transactions_filter_expenses))
+    )
+    val youLabel = stringResource(R.string.users_you)
+    val memberOptions = listOf(
+        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_people))
+    ) + memberEmails.entries
+        .sortedBy { it.value.lowercase() }
+        .map { (userId, email) ->
+            FinanceFilterOption(userId, if (userId == currentUserId) youLabel else email)
+        }
+
+    FinanceCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(FinanceSpacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
+        ) {
+            FinanceSectionHeader(title = stringResource(R.string.transactions_filter_title))
+            FinanceDropdownFilter(
+                label = stringResource(R.string.transactions_filter_month),
+                selectedKey = selectedMonthKey,
+                options = monthOptions,
+                onSelected = onSelectMonth
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
+                FinanceDropdownFilter(
+                    label = stringResource(R.string.transactions_filter_type),
+                    selectedKey = selectedKind?.apiValue,
+                    options = kindOptions,
+                    onSelected = { value ->
+                        onSelectKind(value?.let { TransactionKind.fromApiValue(it) })
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                if (canFilterMembers) {
+                    FinanceDropdownFilter(
+                        label = stringResource(R.string.transactions_filter_person),
+                        selectedKey = selectedMemberId,
+                        options = memberOptions,
+                        onSelected = onSelectMember,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            if (hasActiveFilters) {
+                FinanceButton(
+                    label = stringResource(R.string.transactions_clear_filters),
+                    onClick = onClearFilters,
+                    variant = FinanceButtonVariant.Text
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinanceDropdownFilter(
+    label: String,
+    selectedKey: String?,
+    options: List<FinanceFilterOption>,
+    onSelected: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.key == selectedKey }?.label
+        ?: options.first().label
+    Box(modifier.fillMaxWidth()) {
+        FinanceButton(
+            label = "$label: $selectedLabel",
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            variant = FinanceButtonVariant.Secondary
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        onSelected(option.key)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionSummaryCard(report: FinanceTransactionReport, selectedMonthKey: String?) {
+    val periodLabel = selectedMonthKey?.let(::formatMonthLabel)
+        ?: stringResource(R.string.transactions_filter_all_months)
+    FinanceCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(FinanceSpacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
+        ) {
+            FinanceSectionHeader(
+                title = stringResource(R.string.transactions_summary_title),
+                supportingText = stringResource(R.string.transactions_summary_period, periodLabel)
+            )
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_income),
+                amountCentavos = report.incomeCentavos,
+                kind = FinanceAmountKind.Income
+            )
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_expenses),
+                amountCentavos = report.expenseCentavos,
+                kind = FinanceAmountKind.Expense
+            )
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_balance),
+                amountCentavos = report.balanceCentavos,
+                kind = FinanceAmountKind.Neutral
+            )
+        }
+    }
+}
+
+@Composable
+private fun SummaryAmountRow(
+    label: String,
+    amountCentavos: BigInteger,
+    kind: FinanceAmountKind
+) {
+    val amount = if (kind == FinanceAmountKind.Neutral) {
+        formatSignedBobs(amountCentavos)
+    } else {
+        formatBobs(amountCentavos)
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FinanceAmountText(
+            formattedAmount = amount,
+            kind = kind,
+            accessibilityLabel = "$label, $amount",
+            emphasized = kind == FinanceAmountKind.Neutral
+        )
+    }
+}
+
+@Composable
+private fun MemberBreakdownCard(total: FinanceMemberTotal, currentUserId: String) {
+    val label = when {
+        total.userId == currentUserId -> stringResource(R.string.users_you)
+        !total.email.isNullOrBlank() -> total.email
+        else -> stringResource(R.string.users_role_member)
+    }
+    FinanceCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(FinanceSpacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
+        ) {
+            Text(text = label, style = MaterialTheme.typography.titleMedium)
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_income),
+                amountCentavos = total.incomeCentavos,
+                kind = FinanceAmountKind.Income
+            )
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_expenses),
+                amountCentavos = total.expenseCentavos,
+                kind = FinanceAmountKind.Expense
+            )
+            SummaryAmountRow(
+                label = stringResource(R.string.transactions_summary_balance),
+                amountCentavos = total.balanceCentavos,
+                kind = FinanceAmountKind.Neutral
+            )
+        }
     }
 }
 
@@ -612,6 +924,12 @@ private fun kindLabel(kind: TransactionKind): String = stringResource(
     if (kind == TransactionKind.Income) R.string.transactions_income else R.string.transactions_expense
 )
 
+private fun TransactionKind.toAmountKind(): FinanceAmountKind = if (this == TransactionKind.Income) {
+    FinanceAmountKind.Income
+} else {
+    FinanceAmountKind.Expense
+}
+
 @Composable
 private fun categoryStatusLabel(isActive: Boolean): String = stringResource(
     if (isActive) R.string.categories_active else R.string.categories_inactive
@@ -640,10 +958,29 @@ private fun formatDate(value: String): String = runCatching {
 
 private fun formatAmountInput(centavos: Long): String = BigDecimal.valueOf(centavos, 2).toPlainString()
 
-private fun formatBobs(centavos: Long): String {
+private fun formatMonthLabel(monthKey: String): String = runCatching {
+    val locale = Locale.forLanguageTag("es-BO")
+    val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
+        isLenient = false
+        timeZone = TimeZone.getTimeZone("UTC")
+    }.parse("$monthKey-01") ?: return@runCatching monthKey
+    SimpleDateFormat("MMMM yyyy", locale)
+        .format(date)
+        .replaceFirstChar { first -> first.titlecase(locale) }
+}.getOrDefault(monthKey)
+
+private fun formatBobs(centavos: Long): String = formatBobs(BigInteger.valueOf(centavos))
+
+private fun formatBobs(centavos: BigInteger): String {
     val formatter = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-BO"))
     formatter.currency = Currency.getInstance("BOB")
     formatter.minimumFractionDigits = 2
     formatter.maximumFractionDigits = 2
-    return formatter.format(BigDecimal.valueOf(centavos, 2))
+    return formatter.format(BigDecimal(centavos).movePointLeft(2))
+}
+
+private fun formatSignedBobs(centavos: BigInteger): String = when (centavos.signum()) {
+    1 -> "+${formatBobs(centavos)}"
+    -1 -> "−${formatBobs(centavos.negate())}"
+    else -> formatBobs(BigInteger.ZERO)
 }

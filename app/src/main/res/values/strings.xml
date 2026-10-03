@@ -99,6 +99,26 @@
     <string name="transactions_back">Volver al menú</string>
     <string name="transactions_title">Movimientos</string>
     <string name="transactions_description">Registra y consulta los ingresos y gastos de este espacio.</string>
+    <string name="transactions_filter_title">Filtros</string>
+    <string name="transactions_filter_month">Mes</string>
+    <string name="transactions_filter_all_months">Todos los meses</string>
+    <string name="transactions_filter_type">Tipo</string>
+    <string name="transactions_filter_all_types">Todos los tipos</string>
+    <string name="transactions_filter_income">Ingresos</string>
+    <string name="transactions_filter_expenses">Gastos</string>
+    <string name="transactions_filter_person">Persona</string>
+    <string name="transactions_filter_all_people">Todas</string>
+    <string name="transactions_clear_filters">Limpiar filtros</string>
+    <string name="transactions_summary_title">Resumen</string>
+    <string name="transactions_summary_period">Período: %1$s</string>
+    <string name="transactions_summary_income">Ingresos</string>
+    <string name="transactions_summary_expenses">Gastos</string>
+    <string name="transactions_summary_balance">Diferencia</string>
+    <string name="transactions_category_breakdown">Totales por categoría</string>
+    <string name="transactions_member_breakdown">Totales por persona</string>
+    <string name="transactions_list_title">Movimientos</string>
+    <string name="transactions_no_filter_results_title">No hay movimientos con estos filtros</string>
+    <string name="transactions_no_filter_results_description">Prueba otro mes, tipo o persona, o limpia los filtros.</string>
     <string name="transactions_register">Registrar movimiento</string>
     <string name="transactions_manage_categories">Gestionar categorías</string>
     <string name="transactions_pending_sync_count">%1$d cambios esperan sincronización automática.</string>
@@ -160,4 +180,8 @@
     <string name="home_sign_out">Cerrar sesión</string>
     <string name="home_signing_out">Cerrando sesión…</string>
     <string name="ui_close">Cerrar</string>
+    <plurals name="transactions_results_count">
+        <item quantity="one">%1$d resultado</item>
+        <item quantity="other">%1$d resultados</item>
+    </plurals>
 </resources>

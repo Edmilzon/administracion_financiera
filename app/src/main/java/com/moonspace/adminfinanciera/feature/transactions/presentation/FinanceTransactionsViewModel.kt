@@ -10,9 +10,13 @@ import com.moonspace.adminfinanciera.feature.transactions.domain.CategoryDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceCategory
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceDataError
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceDataException
+import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceTransactionReport
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceTransaction
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinancialRepository
 import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionDraft
+import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionKind
+import com.moonspace.adminfinanciera.feature.transactions.domain.buildFinanceTransactionReport
+import com.moonspace.adminfinanciera.feature.transactions.domain.filterFinanceTransactions
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdMembersRepository
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdRole
 import com.moonspace.adminfinanciera.feature.users.domain.UserManagementException
@@ -33,6 +37,9 @@ data class FinanceTransactionsUiState(
     val transactions: List<FinanceTransaction> = emptyList(),
     val memberEmails: Map<String, String> = emptyMap(),
     val pendingSyncCount: Int = 0,
+    val selectedMonthKey: String? = null,
+    val selectedKind: TransactionKind? = null,
+    val selectedMemberId: String? = null,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val noticeMessage: String? = null,
@@ -41,6 +48,16 @@ data class FinanceTransactionsUiState(
     val categorySavedVersion: Int = 0
 ) {
     val canManageCategories: Boolean get() = role == HouseholdRole.Admin
+    val availableMonthKeys: List<String>
+        get() = (transactions.map { it.occurredOn.take(7) } + listOfNotNull(selectedMonthKey))
+            .distinct()
+            .sortedDescending()
+    val filteredTransactions: List<FinanceTransaction>
+        get() = filterFinanceTransactions(transactions, selectedMonthKey, selectedKind, selectedMemberId)
+    val report: FinanceTransactionReport
+        get() = buildFinanceTransactionReport(filteredTransactions, memberEmails)
+    val hasActiveFilters: Boolean
+        get() = selectedMonthKey != null || selectedKind != null || selectedMemberId != null
 }
 
 class FinanceTransactionsViewModel(
@@ -80,18 +97,28 @@ class FinanceTransactionsViewModel(
                         categories = emptyList(),
                         transactions = emptyList(),
                         memberEmails = emptyMap(),
+                        selectedMonthKey = null,
+                        selectedKind = null,
+                        selectedMemberId = null,
                         errorMessage = null
                     )
                     return@launch
                 }
 
                 financialRepository.prepareHousehold(user.id, householdId, role.apiValue)
+                val previousState = _uiState.value
+                val householdChanged = previousState.householdId != householdId
+                val memberEmails = snapshot.members.associate { it.userId to it.email }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     hasHousehold = true,
                     householdId = householdId,
                     role = role,
-                    memberEmails = snapshot.members.associate { it.userId to it.email },
+                    memberEmails = memberEmails,
+                    selectedMonthKey = previousState.selectedMonthKey.takeUnless { householdChanged },
+                    selectedKind = previousState.selectedKind.takeUnless { householdChanged },
+                    selectedMemberId = previousState.selectedMemberId
+                        ?.takeIf { !householdChanged && role == HouseholdRole.Admin && it in memberEmails },
                     errorMessage = null
                 )
                 startObserving(user, householdId, role)
@@ -143,6 +170,29 @@ class FinanceTransactionsViewModel(
             financialRepository.deactivateCategory(user.id, householdId, role, categoryId)
             _uiState.value = _uiState.value.copy(categorySavedVersion = _uiState.value.categorySavedVersion + 1)
         }
+    }
+
+    fun selectMonth(monthKey: String?) {
+        if (monthKey != null && monthKey !in _uiState.value.availableMonthKeys) return
+        _uiState.value = _uiState.value.copy(selectedMonthKey = monthKey)
+    }
+
+    fun selectKind(kind: TransactionKind?) {
+        _uiState.value = _uiState.value.copy(selectedKind = kind)
+    }
+
+    fun selectMember(memberId: String?) {
+        val state = _uiState.value
+        if (memberId != null && (!state.canManageCategories || memberId !in state.memberEmails)) return
+        _uiState.value = state.copy(selectedMemberId = memberId)
+    }
+
+    fun clearFilters() {
+        _uiState.value = _uiState.value.copy(
+            selectedMonthKey = null,
+            selectedKind = null,
+            selectedMemberId = null
+        )
     }
 
     fun clearMessages() {
