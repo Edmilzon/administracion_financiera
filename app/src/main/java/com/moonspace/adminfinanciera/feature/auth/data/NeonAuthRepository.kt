@@ -8,6 +8,7 @@ import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthBootstrap
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
+import com.moonspace.adminfinanciera.feature.auth.domain.MemberAccountProvisionResult
 import com.moonspace.adminfinanciera.feature.auth.domain.SignInResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -81,6 +82,43 @@ internal class NeonAuthRepository(
 
     override suspend fun createAccount(email: String, password: String): SignInResult =
         authenticate(isCreatingAccount = true) { authClient.signUp(normalizeEmail(email), password) }
+
+    override suspend fun createMemberAccount(
+        email: String,
+        password: String
+    ): MemberAccountProvisionResult = withContext(Dispatchers.IO) {
+        if (!config.isAuthConfigured) {
+            return@withContext MemberAccountProvisionResult.Failure(
+                appContext.getString(R.string.auth_config_missing)
+            )
+        }
+
+        val normalizedEmail = normalizeEmail(email)
+        try {
+            val response = authClient.signUp(normalizedEmail, password)
+            response.toManagedAccount(isNewAccount = true)
+        } catch (error: NeonAuthHttpException) {
+            if (!error.isExistingAccount()) {
+                return@withContext MemberAccountProvisionResult.Failure(errorMessage(error))
+            }
+
+            // A retry can finish household linking after sign-up succeeded but the Data API request failed.
+            // Keep the returned cookie local to this request; never replace the administrator's session.
+            try {
+                authClient.signIn(normalizedEmail, password).toManagedAccount(isNewAccount = false)
+            } catch (signInError: NeonAuthHttpException) {
+                MemberAccountProvisionResult.Failure(errorMessage(signInError))
+            } catch (_: IOException) {
+                MemberAccountProvisionResult.Failure(appContext.getString(R.string.auth_connection_unavailable))
+            } catch (_: Exception) {
+                MemberAccountProvisionResult.Failure(appContext.getString(R.string.auth_request_failed))
+            }
+        } catch (_: IOException) {
+            MemberAccountProvisionResult.Failure(appContext.getString(R.string.auth_connection_unavailable))
+        } catch (_: Exception) {
+            MemberAccountProvisionResult.Failure(appContext.getString(R.string.auth_request_failed))
+        }
+    }
 
     override suspend fun signIn(email: String, password: String): SignInResult =
         authenticate(isCreatingAccount = false) {
@@ -201,6 +239,26 @@ internal class NeonAuthRepository(
             appContext.getString(R.string.auth_account_exists)
         else -> appContext.getString(R.string.auth_request_failed)
     }
+
+    private fun NeonAuthResponse.toManagedAccount(isNewAccount: Boolean): MemberAccountProvisionResult {
+        val userId = userId
+        val email = email
+        if (userId.isNullOrBlank() || email.isNullOrBlank()) {
+            return MemberAccountProvisionResult.Failure(
+                appContext.getString(R.string.auth_session_unavailable)
+            )
+        }
+        // Deliberately do not call store.save() or cacheToken(): the current admin session stays active.
+        return MemberAccountProvisionResult.Ready(
+            user = AuthUser(id = userId, email = email),
+            isNewAccount = isNewAccount,
+            emailVerificationRequired = emailVerificationRequired
+        )
+    }
+
+    private fun NeonAuthHttpException.isExistingAccount(): Boolean =
+        statusCode == 409 || errorCode?.contains("already", ignoreCase = true) == true ||
+            errorCode?.contains("exist", ignoreCase = true) == true
 
     private fun dataApiNotice(): String? = if (config.isDataApiConfigured) null else {
         appContext.getString(R.string.auth_data_api_missing)

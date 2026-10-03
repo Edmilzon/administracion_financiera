@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +34,8 @@ import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 fun DashboardScreen(
     user: AuthUser,
     isSigningOut: Boolean,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onOpenUsers: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -128,6 +130,12 @@ fun DashboardScreen(
                 title = stringResource(R.string.menu_reports),
                 description = stringResource(R.string.menu_reports_description)
             )
+            MenuTile(
+                number = "05",
+                title = stringResource(R.string.menu_users),
+                description = stringResource(R.string.menu_users_description),
+                onClick = onOpenUsers
+            )
         }
     }
 }
@@ -136,9 +144,12 @@ fun DashboardScreen(
 private fun MenuTile(
     number: String,
     title: String,
-    description: String
+    description: String,
+    onClick: (() -> Unit)? = null
 ) {
-    FinanceCard(modifier = Modifier.fillMaxWidth()) {
+    val modifier = if (onClick == null) Modifier.fillMaxWidth()
+    else Modifier.fillMaxWidth().clickable(onClick = onClick)
+    FinanceCard(modifier = modifier) {
         Row(
             modifier = Modifier.padding(FinanceSpacing.Medium),
             horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Compact),
@@ -171,8 +182,10 @@ private fun MenuTile(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 FinanceStatusPill(
-                    label = stringResource(R.string.menu_coming_soon),
-                    tone = FinanceStatusTone.Info
+                    label = stringResource(
+                        if (onClick == null) R.string.menu_coming_soon else R.string.menu_open
+                    ),
+                    tone = if (onClick == null) FinanceStatusTone.Info else FinanceStatusTone.Success
                 )
             }
         }

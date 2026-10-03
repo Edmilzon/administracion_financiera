@@ -7,7 +7,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +23,8 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
 import com.moonspace.adminfinanciera.feature.auth.presentation.AuthViewModel
 import com.moonspace.adminfinanciera.feature.auth.presentation.LoginScreen
 import com.moonspace.adminfinanciera.feature.dashboard.presentation.DashboardScreen
+import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersScreen
+import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersViewModel
 
 @Composable
 fun FinanceNavigation() {
@@ -34,15 +39,45 @@ fun FinanceNavigation() {
         authViewModel.restoreSession()
     }
 
-    when {
-        uiState.isCheckingSession -> SessionLoadingScreen()
-        uiState.user != null -> DashboardScreen(
-            user = requireNotNull(uiState.user),
-            isSigningOut = uiState.isSubmitting,
-            onSignOut = authViewModel::signOut
+    if (uiState.isCheckingSession) {
+        SessionLoadingScreen()
+    } else if (uiState.user != null) {
+        val user = requireNotNull(uiState.user)
+        val membersViewModel: HouseholdMembersViewModel = viewModel(
+            factory = remember(container) {
+                HouseholdMembersViewModel.Factory(context, container.householdMembersRepository)
+            }
         )
+        val membersState by membersViewModel.uiState.collectAsStateWithLifecycle()
+        var isShowingMembers by rememberSaveable(user.id) { mutableStateOf(false) }
 
-        else -> LoginScreen(
+        LaunchedEffect(user.id, isShowingMembers) {
+            if (isShowingMembers) membersViewModel.load(user)
+        }
+
+        if (isShowingMembers) {
+            HouseholdMembersScreen(
+                user = user,
+                state = membersState,
+                onBack = { isShowingMembers = false },
+                onRefresh = { membersViewModel.load(user) },
+                onCreateHousehold = { membersViewModel.createHousehold(user, it) },
+                onCreateMember = { email, password, role ->
+                    membersViewModel.createMember(user, email, password, role)
+                },
+                onUpdateRole = { userId, role -> membersViewModel.updateRole(user, userId, role) },
+                onRemoveMember = { userId -> membersViewModel.removeMember(user, userId) }
+            )
+        } else {
+            DashboardScreen(
+                user = user,
+                isSigningOut = uiState.isSubmitting,
+                onSignOut = authViewModel::signOut,
+                onOpenUsers = { isShowingMembers = true }
+            )
+        }
+    } else {
+        LoginScreen(
             isAuthConfigured = uiState.isAuthConfigured,
             isSubmitting = uiState.isSubmitting,
             errorMessage = uiState.errorMessage,

@@ -6,6 +6,8 @@ import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
 import com.moonspace.adminfinanciera.feature.auth.data.NeonAuthRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
+import com.moonspace.adminfinanciera.feature.users.data.NeonHouseholdMembersRepository
+import com.moonspace.adminfinanciera.feature.users.domain.HouseholdMembersRepository
 
 class FinanceAppContainer(context: Context) {
     val neonApiConfig = NeonApiConfig(
@@ -15,4 +17,10 @@ class FinanceAppContainer(context: Context) {
     private val neonAuthRepository = NeonAuthRepository(context.applicationContext, neonApiConfig)
     val authRepository: AuthRepository = neonAuthRepository
     val dataApiClient = NeonDataApiClient(neonApiConfig, neonAuthRepository)
+    val householdMembersRepository: HouseholdMembersRepository = NeonHouseholdMembersRepository(
+        context = context.applicationContext,
+        config = neonApiConfig,
+        dataApiClient = dataApiClient,
+        authRepository = authRepository
+    )
 }
