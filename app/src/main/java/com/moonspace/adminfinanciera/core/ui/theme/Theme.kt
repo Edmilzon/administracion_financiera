@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 private val LightColorScheme = lightColorScheme(
     primary = FinanceColors.Primary,
@@ -45,9 +46,17 @@ fun FinanceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-        typography = FinanceTypography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalFinanceSemanticColors provides if (darkTheme) {
+            DarkFinanceSemanticColors
+        } else {
+            LightFinanceSemanticColors
+        }
+    ) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+            typography = FinanceTypography,
+            content = content
+        )
+    }
 }

@@ -50,3 +50,11 @@ val FinanceTypography = Typography(
         lineHeight = 16.sp
     )
 )
+
+val FinanceAmountStyle = TextStyle(
+    fontFamily = FontFamily.Default,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 32.sp,
+    lineHeight = 40.sp,
+    fontFeatureSettings = "tnum"
+)

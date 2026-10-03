@@ -1,6 +1,5 @@
 package com.moonspace.adminfinanciera.feature.dashboard.presentation
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,20 +9,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.moonspace.adminfinanciera.R
-import com.moonspace.adminfinanciera.core.ui.theme.FinanceColors
+import com.moonspace.adminfinanciera.core.ui.components.FinanceButton
+import com.moonspace.adminfinanciera.core.ui.components.FinanceButtonVariant
+import com.moonspace.adminfinanciera.core.ui.components.FinanceCard
+import com.moonspace.adminfinanciera.core.ui.components.FinanceSectionHeader
+import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
+import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusPill
+import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
+import com.moonspace.adminfinanciera.core.ui.theme.FinanceShapes
+import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 
 @Composable
@@ -36,8 +39,8 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Large),
+        verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Large)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -49,17 +52,17 @@ fun DashboardScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary
             )
-            OutlinedButton(
+            FinanceButton(
+                label = stringResource(R.string.home_sign_out),
                 onClick = onSignOut,
+                variant = FinanceButtonVariant.Secondary,
                 enabled = !isSigningOut,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Text(stringResource(R.string.home_sign_out))
-            }
+                isLoading = isSigningOut,
+                loadingLabel = stringResource(R.string.home_signing_out)
+            )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
             Text(
                 text = stringResource(R.string.home_title),
                 style = MaterialTheme.typography.headlineMedium,
@@ -75,32 +78,25 @@ fun DashboardScreen(
         }
 
         if (user.isLocalOnly) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    text = stringResource(R.string.home_local_only),
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FinanceColors.Info
-                )
-            }
+            FinanceStatusBanner(
+                message = stringResource(R.string.home_local_only),
+                tone = FinanceStatusTone.Info
+            )
         }
 
-        Surface(
+        FinanceCard(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.primaryContainer
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            outlined = false,
+            shape = FinanceShapes.Panel
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(FinanceSpacing.Large)) {
                 Text(
                     text = stringResource(R.string.home_summary_title),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(FinanceSpacing.Small))
                 Text(
                     text = stringResource(R.string.home_summary_description),
                     style = MaterialTheme.typography.bodyMedium,
@@ -109,16 +105,10 @@ fun DashboardScreen(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = stringResource(R.string.home_menu_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.home_next_step),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
+            FinanceSectionHeader(
+                title = stringResource(R.string.home_menu_title),
+                supportingText = stringResource(R.string.home_next_step)
             )
             MenuTile(
                 number = "01",
@@ -150,29 +140,28 @@ private fun MenuTile(
     title: String,
     description: String
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
+    FinanceCard(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(FinanceSpacing.Medium),
+            horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Compact),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+            FinanceCard(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                outlined = false,
+                shape = FinanceShapes.Control
             ) {
                 Text(
                     text = number,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = FinanceSpacing.Small, vertical = FinanceSpacing.Medium),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
@@ -183,12 +172,11 @@ private fun MenuTile(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                FinanceStatusPill(
+                    label = stringResource(R.string.menu_coming_soon),
+                    tone = FinanceStatusTone.Info
+                )
             }
-            Text(
-                text = stringResource(R.string.menu_coming_soon),
-                style = MaterialTheme.typography.labelSmall,
-                color = FinanceColors.Info
-            )
         }
     }
 }
