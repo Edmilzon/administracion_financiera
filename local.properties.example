@@ -1,0 +1,4 @@
+# Copia este archivo como local.properties y reemplaza las URLs por las de tu rama Neon.
+# Son endpoints HTTPS públicos; no pegues aquí una cadena PostgreSQL, API key o contraseña.
+NEON_AUTH_BASE_URL=https://<endpoint-de-auth>/<base-de-datos>/auth
+NEON_DATA_API_URL=https://<endpoint-de-data-api>/<base-de-datos>/rest/v1

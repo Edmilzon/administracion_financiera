@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,30 +41,31 @@ import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 
 @Composable
 fun LoginScreen(
-    hasLocalAccount: Boolean,
+    isAuthConfigured: Boolean,
     isSubmitting: Boolean,
     errorMessage: String?,
-    onCreateLocalAccount: (String, String) -> Unit,
+    noticeMessage: String?,
+    onCreateAccount: (String, String) -> Unit,
     onSignIn: (String, String) -> Unit
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordConfirmation by rememberSaveable { mutableStateOf("") }
+    var creatingAccount by rememberSaveable { mutableStateOf(false) }
     var emailTouched by rememberSaveable { mutableStateOf(false) }
     var passwordConfirmationTouched by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val passwordFocusRequester = remember { FocusRequester() }
     val confirmationFocusRequester = remember { FocusRequester() }
-    val creatingAccount = !hasLocalAccount
     val validEmail = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val passwordTooShort = creatingAccount && password.isNotEmpty() && password.length < MIN_PASSWORD_LENGTH
     val passwordsMatch = !creatingAccount || password == passwordConfirmation
-    val canSubmit = !isSubmitting && validEmail && password.isNotEmpty() &&
+    val canSubmit = isAuthConfigured && !isSubmitting && validEmail && password.isNotEmpty() &&
         (!creatingAccount || (password.length >= MIN_PASSWORD_LENGTH && passwordsMatch))
     val onSubmit: () -> Unit = {
         if (canSubmit) {
             focusManager.clearFocus()
-            if (creatingAccount) onCreateLocalAccount(email.trim(), password)
+            if (creatingAccount) onCreateAccount(email.trim(), password)
             else onSignIn(email.trim(), password)
         }
     }
@@ -87,13 +89,13 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(FinanceSpacing.Small))
             Text(
-                text = stringResource(if (creatingAccount) R.string.local_create_title else R.string.login_title),
+                text = stringResource(if (creatingAccount) R.string.auth_create_title else R.string.login_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(FinanceSpacing.XSmall))
             Text(
-                text = stringResource(if (creatingAccount) R.string.local_create_description else R.string.login_description),
+                text = stringResource(if (creatingAccount) R.string.auth_create_description else R.string.login_description),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -131,7 +133,7 @@ fun LoginScreen(
                         modifier = Modifier.focusRequester(passwordFocusRequester),
                         enabled = !isSubmitting,
                         isError = passwordTooShort,
-                        supportingText = if (creatingAccount) stringResource(R.string.local_password_rule) else null,
+                        supportingText = if (creatingAccount) stringResource(R.string.auth_password_rule) else null,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
                             imeAction = if (creatingAccount) ImeAction.Next else ImeAction.Done
@@ -149,12 +151,12 @@ fun LoginScreen(
                                 passwordConfirmation = it
                                 passwordConfirmationTouched = true
                             },
-                            label = stringResource(R.string.local_confirm_password_label),
+                            label = stringResource(R.string.auth_confirm_password_label),
                             modifier = Modifier.focusRequester(confirmationFocusRequester),
                             enabled = !isSubmitting,
                             isError = passwordConfirmationTouched && passwordConfirmation.isNotEmpty() && !passwordsMatch,
                             supportingText = if (passwordConfirmationTouched && passwordConfirmation.isNotEmpty() && !passwordsMatch) {
-                                stringResource(R.string.local_password_mismatch)
+                                stringResource(R.string.auth_password_mismatch)
                             } else null,
                             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
                             showVisibilityControl = false
@@ -171,7 +173,7 @@ fun LoginScreen(
 
                     FinanceButton(
                         label = stringResource(
-                            if (creatingAccount) R.string.local_create_action else R.string.login_submit
+                            if (creatingAccount) R.string.auth_create_action else R.string.login_submit
                         ),
                         onClick = onSubmit,
                         modifier = Modifier.fillMaxWidth(),
@@ -182,11 +184,31 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(Modifier.height(FinanceSpacing.Medium))
-            FinanceStatusBanner(
-                message = stringResource(R.string.local_only_notice),
-                tone = FinanceStatusTone.Info
-            )
+            if (noticeMessage != null) {
+                Spacer(Modifier.height(FinanceSpacing.Medium))
+                FinanceStatusBanner(
+                    message = noticeMessage,
+                    tone = FinanceStatusTone.Info
+                )
+            }
+
+            Spacer(Modifier.height(FinanceSpacing.Small))
+            TextButton(
+                onClick = {
+                    creatingAccount = !creatingAccount
+                    password = ""
+                    passwordConfirmation = ""
+                    passwordConfirmationTouched = false
+                },
+                enabled = !isSubmitting
+            ) {
+                Text(
+                    text = stringResource(
+                        if (creatingAccount) R.string.auth_switch_to_sign_in
+                        else R.string.auth_switch_to_create
+                    )
+                )
+            }
         }
     }
 }

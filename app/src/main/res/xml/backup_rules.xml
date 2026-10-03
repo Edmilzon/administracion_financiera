@@ -6,5 +6,5 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <exclude domain="sharedpref" path="finance_local_auth.xml" />
+    <exclude domain="sharedpref" path="finance_remote_auth.xml" />
 </full-backup-content>

@@ -43,10 +43,11 @@ fun FinanceNavigation() {
         )
 
         else -> LoginScreen(
-            hasLocalAccount = uiState.hasLocalAccount,
+            isAuthConfigured = uiState.isAuthConfigured,
             isSubmitting = uiState.isSubmitting,
             errorMessage = uiState.errorMessage,
-            onCreateLocalAccount = authViewModel::createLocalAccount,
+            noticeMessage = uiState.noticeMessage,
+            onCreateAccount = authViewModel::createAccount,
             onSignIn = authViewModel::signIn
         )
     }

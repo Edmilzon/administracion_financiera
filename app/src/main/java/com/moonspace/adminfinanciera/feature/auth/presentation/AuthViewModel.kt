@@ -14,9 +14,10 @@ import kotlinx.coroutines.launch
 data class AuthUiState(
     val isCheckingSession: Boolean = true,
     val isSubmitting: Boolean = false,
-    val hasLocalAccount: Boolean = false,
+    val isAuthConfigured: Boolean = false,
     val user: AuthUser? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val noticeMessage: String? = null
 )
 
 class AuthViewModel(
@@ -31,19 +32,20 @@ class AuthViewModel(
             val bootstrap = repository.restoreSession()
             _uiState.value = AuthUiState(
                 isCheckingSession = false,
-                hasLocalAccount = bootstrap.hasLocalAccount,
-                user = bootstrap.user
+                isAuthConfigured = bootstrap.isAuthConfigured,
+                user = bootstrap.user,
+                noticeMessage = bootstrap.noticeMessage
             )
         }
     }
 
-    fun createLocalAccount(email: String, password: String) {
-        if (_uiState.value.isSubmitting || _uiState.value.hasLocalAccount) return
-        submit { repository.createLocalAccount(email, password) }
+    fun createAccount(email: String, password: String) {
+        if (_uiState.value.isSubmitting || !_uiState.value.isAuthConfigured) return
+        submit { repository.createAccount(email, password) }
     }
 
     fun signIn(email: String, password: String) {
-        if (_uiState.value.isSubmitting || !_uiState.value.hasLocalAccount) return
+        if (_uiState.value.isSubmitting || !_uiState.value.isAuthConfigured) return
         submit { repository.signIn(email, password) }
     }
 
@@ -54,8 +56,15 @@ class AuthViewModel(
                 is SignInResult.Success -> _uiState.value = AuthUiState(
                     isCheckingSession = false,
                     isSubmitting = false,
-                    hasLocalAccount = true,
+                    isAuthConfigured = true,
                     user = result.user
+                )
+
+                is SignInResult.NeedsEmailVerification -> _uiState.value = _uiState.value.copy(
+                    isCheckingSession = false,
+                    isSubmitting = false,
+                    noticeMessage = result.message,
+                    errorMessage = null
                 )
 
                 is SignInResult.Failure -> _uiState.value = _uiState.value.copy(

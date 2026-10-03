@@ -77,12 +77,10 @@ fun DashboardScreen(
             )
         }
 
-        if (user.isLocalOnly) {
-            FinanceStatusBanner(
-                message = stringResource(R.string.home_local_only),
-                tone = FinanceStatusTone.Info
-            )
-        }
+        FinanceStatusBanner(
+            message = stringResource(R.string.home_storage_pending),
+            tone = FinanceStatusTone.Info
+        )
 
         FinanceCard(
             modifier = Modifier.fillMaxWidth(),
