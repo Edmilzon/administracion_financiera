@@ -6,6 +6,7 @@ import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvi
 import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
 import com.moonspace.adminfinanciera.core.database.TransactionDeletionMarkerEntity
 import com.moonspace.adminfinanciera.core.database.TransactionEntity
+import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
 import com.moonspace.adminfinanciera.feature.transactions.domain.CategoryDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceCategory
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceDataError
@@ -24,7 +25,8 @@ import java.util.TimeZone
 import java.util.UUID
 
 class RoomFinancialRepository(
-    private val databases: EncryptedFinanceDatabaseProvider
+    private val databases: EncryptedFinanceDatabaseProvider,
+    private val syncScheduler: FinanceSyncScheduler
 ) : FinancialRepository {
     override fun observeCategories(
         accountId: String,
@@ -107,6 +109,7 @@ class RoomFinancialRepository(
                 categoryDao.insertDefaults(defaults)
             }
         }
+        syncScheduler.scheduleNow(accountId)
     }
 
     override suspend fun saveTransaction(
@@ -146,12 +149,14 @@ class RoomFinancialRepository(
                     occurredOn = draft.occurredOn,
                     description = draft.description?.trim()?.takeIf(String::isNotEmpty),
                     createdAt = previous?.createdAt ?: now,
-                    updatedAt = now
+                    updatedAt = now,
+                    isRemoteBacked = previous?.isRemoteBacked ?: false
                 )
             )
             database.transactionDeletionMarkerDao().remove(id)
             enqueue(accountId, ENTITY_TRANSACTION, id)
         }
+        syncScheduler.scheduleNow(accountId)
     }
 
     override suspend fun deleteOwnTransaction(
@@ -176,6 +181,7 @@ class RoomFinancialRepository(
             )
             enqueue(accountId, ENTITY_TRANSACTION, transactionId, OPERATION_DELETE)
         }
+        syncScheduler.scheduleNow(accountId)
     }
 
     override suspend fun saveCategory(
@@ -224,6 +230,7 @@ class RoomFinancialRepository(
             if (previous == null) dao.insert(updatedCategory) else dao.update(updatedCategory)
             enqueue(accountId, ENTITY_CATEGORY, categoryId)
         }
+        syncScheduler.scheduleNow(accountId)
     }
 
     override suspend fun deactivateCategory(
@@ -246,6 +253,7 @@ class RoomFinancialRepository(
                 enqueue(accountId, ENTITY_CATEGORY, categoryId)
             }
         }
+        syncScheduler.scheduleNow(accountId)
     }
 
     private suspend fun enqueue(

@@ -45,6 +45,9 @@ fun FinanceNavigation() {
         SessionLoadingScreen()
     } else if (uiState.user != null) {
         val user = requireNotNull(uiState.user)
+        LaunchedEffect(user.id) {
+            container.syncScheduler.scheduleForSignedInAccount(user.id)
+        }
         val membersViewModel: HouseholdMembersViewModel = viewModel(
             factory = remember(container) {
                 HouseholdMembersViewModel.Factory(context, container.householdMembersRepository)
@@ -106,6 +109,7 @@ fun FinanceNavigation() {
                 isSigningOut = uiState.isSubmitting,
                 onSignOut = {
                     transactionsViewModel.clearAccountContext()
+                    container.syncScheduler.cancelAccount(user.id)
                     container.closeFinancialDatabases()
                     authViewModel.signOut()
                 },

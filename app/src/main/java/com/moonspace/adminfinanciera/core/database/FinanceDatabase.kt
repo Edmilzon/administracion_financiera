@@ -10,7 +10,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "household_cache")
@@ -108,7 +111,9 @@ data class TransactionEntity(
     @androidx.room.ColumnInfo(name = "occurred_on") val occurredOn: String,
     val description: String?,
     @androidx.room.ColumnInfo(name = "created_at") val createdAt: Long,
-    @androidx.room.ColumnInfo(name = "updated_at") val updatedAt: Long
+    @androidx.room.ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @androidx.room.ColumnInfo(name = "is_remote_backed", defaultValue = "0")
+    val isRemoteBacked: Boolean = false
 )
 
 @Entity(
@@ -136,6 +141,17 @@ data class SyncOutboxEntity(
 data class TransactionDeletionMarkerEntity(
     @androidx.room.ColumnInfo(name = "transaction_id") val transactionId: String,
     @androidx.room.ColumnInfo(name = "deleted_at") val deletedAt: Long
+)
+
+@Entity(tableName = "sync_state")
+data class SyncStateEntity(
+    @PrimaryKey
+    @androidx.room.ColumnInfo(name = "account_id")
+    val accountId: String,
+    @androidx.room.ColumnInfo(name = "household_id")
+    val householdId: String,
+    @androidx.room.ColumnInfo(name = "last_successful_sync_at")
+    val lastSuccessfulSyncAt: Long
 )
 
 @Dao
@@ -204,11 +220,30 @@ interface CategoryDao {
     @Insert
     suspend fun insert(entity: CategoryEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfMissing(entity: CategoryEntity): Long
+
     @Update
-    suspend fun update(entity: CategoryEntity)
+    suspend fun update(entity: CategoryEntity): Int
+
+    @Transaction
+    suspend fun upsert(entity: CategoryEntity) {
+        if (insertIfMissing(entity) == -1L && update(entity) == 0) {
+            throw IllegalStateException("A local category conflicts with a remote category identifier.")
+        }
+    }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertDefaults(entities: List<CategoryEntity>)
+
+    @Query("SELECT * FROM categories WHERE household_id = :householdId")
+    suspend fun allForHousehold(householdId: String): List<CategoryEntity>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE household_id = :householdId AND category_id = :categoryId")
+    suspend fun countForCategory(householdId: String, categoryId: String): Int
+
+    @Query("DELETE FROM categories WHERE household_id = :householdId AND id = :categoryId")
+    suspend fun deleteById(householdId: String, categoryId: String)
 
     @Query("DELETE FROM categories WHERE household_id = :householdId")
     suspend fun deleteForHousehold(householdId: String)
@@ -225,6 +260,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :transactionId AND household_id = :householdId LIMIT 1")
     suspend fun findById(householdId: String, transactionId: String): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE household_id = :householdId")
+    suspend fun allForHousehold(householdId: String): List<TransactionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(entity: TransactionEntity)
 
@@ -236,12 +274,18 @@ interface TransactionDao {
 
     @Query("DELETE FROM transactions WHERE household_id = :householdId")
     suspend fun deleteForHousehold(householdId: String)
+
+    @Query("UPDATE transactions SET is_remote_backed = 1 WHERE id = :transactionId AND household_id = :householdId")
+    suspend fun markRemoteBacked(householdId: String, transactionId: String)
 }
 
 @Dao
 interface SyncOutboxDao {
     @Query("DELETE FROM sync_outbox WHERE account_id = :accountId AND entity_type = :entityType AND entity_id = :entityId")
     suspend fun removeForEntity(accountId: String, entityType: String, entityId: String)
+
+    @Query("DELETE FROM sync_outbox WHERE id = :id")
+    suspend fun removeById(id: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun enqueue(entity: SyncOutboxEntity)
@@ -258,6 +302,9 @@ interface SyncOutboxDao {
 
 @Dao
 interface TransactionDeletionMarkerDao {
+    @Query("SELECT * FROM transaction_deletion_markers WHERE transaction_id = :transactionId LIMIT 1")
+    suspend fun findById(transactionId: String): TransactionDeletionMarkerEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(marker: TransactionDeletionMarkerEntity)
 
@@ -268,6 +315,15 @@ interface TransactionDeletionMarkerDao {
     suspend fun clearAll()
 }
 
+@Dao
+interface SyncStateDao {
+    @Query("SELECT * FROM sync_state WHERE account_id = :accountId LIMIT 1")
+    suspend fun get(accountId: String): SyncStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(entity: SyncStateEntity)
+}
+
 @Database(
     entities = [
         HouseholdCacheEntity::class,
@@ -275,15 +331,39 @@ interface TransactionDeletionMarkerDao {
         CategoryEntity::class,
         TransactionEntity::class,
         SyncOutboxEntity::class,
-        TransactionDeletionMarkerEntity::class
+        TransactionDeletionMarkerEntity::class,
+        SyncStateEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
+    abstract fun syncStateDao(): SyncStateDao
     abstract fun householdCacheDao(): HouseholdCacheDao
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun transactionDeletionMarkerDao(): TransactionDeletionMarkerDao
+
+    companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `sync_state` " +
+                        "(`account_id` TEXT NOT NULL, `household_id` TEXT NOT NULL, " +
+                        "`last_successful_sync_at` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`account_id`))"
+                )
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `transactions` ADD COLUMN `is_remote_backed` " +
+                        "INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+    }
 }

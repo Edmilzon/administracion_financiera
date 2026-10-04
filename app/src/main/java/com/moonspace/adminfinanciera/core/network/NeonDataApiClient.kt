@@ -35,7 +35,8 @@ class NeonDataApiClient(
         resource: String,
         method: NeonDataApiMethod,
         query: Map<String, String> = emptyMap(),
-        body: JSONObject? = null
+        body: JSONObject? = null,
+        prefer: String? = null
     ): NeonDataApiResponse = withContext(Dispatchers.IO) {
         val baseUrl = config.dataApiBaseUrl()
             ?: throw IllegalStateException("Neon Data API is not configured with an HTTPS URL.")
@@ -55,6 +56,7 @@ class NeonDataApiClient(
             .header("Authorization", "Bearer $token")
             .header("Accept", "application/json")
         if (body != null) builder.header("Content-Type", "application/json")
+        if (!prefer.isNullOrBlank()) builder.header("Prefer", prefer)
         builder.method(method.name, requestBody)
 
         httpClient.newCall(builder.build()).execute().use { response ->
