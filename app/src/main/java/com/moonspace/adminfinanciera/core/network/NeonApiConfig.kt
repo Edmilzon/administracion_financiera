@@ -17,9 +17,10 @@ class NeonApiConfig(
     val isDataApiConfigured: Boolean
         get() = dataApiBase != null
 
-    /** Neon Auth URLs from the console are mounted below `/api/auth` by Better Auth. */
+    /** Neon Auth's console URL already includes its route (for example `/neondb/auth`). */
     fun authApiBaseUrl(): HttpUrl? = authBase?.let { base ->
-        if (base.encodedPath.trimEnd('/').endsWith("/api/auth")) {
+        val path = base.encodedPath.trimEnd('/')
+        if (path.endsWith("/auth")) {
             base
         } else {
             base.newBuilder().addPathSegments("api/auth").build()
