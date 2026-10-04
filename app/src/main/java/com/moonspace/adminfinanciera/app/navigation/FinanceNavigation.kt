@@ -1,8 +1,15 @@
 package com.moonspace.adminfinanciera.app.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,6 +26,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.app.di.FinanceAppContainer
+import com.moonspace.adminfinanciera.core.ui.components.FinanceBottomNavigationBar
+import com.moonspace.adminfinanciera.core.ui.components.FinanceNavigationDestination
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
 import com.moonspace.adminfinanciera.feature.auth.presentation.AuthViewModel
 import com.moonspace.adminfinanciera.feature.auth.presentation.LoginScreen
@@ -87,63 +96,96 @@ fun FinanceNavigation() {
             }
         }
 
-        if (destination == DESTINATION_USERS) {
-            HouseholdMembersScreen(
-                user = user,
-                state = membersState,
-                onBack = { destination = DESTINATION_DASHBOARD },
-                onRefresh = { membersViewModel.load(user) },
-                onCreateHousehold = { membersViewModel.createHousehold(user, it) },
-                onCreateMember = { email, password, role ->
-                    membersViewModel.createMember(user, email, password, role)
-                },
-                onUpdateRole = { userId, role -> membersViewModel.updateRole(user, userId, role) },
-                onRemoveMember = { userId -> membersViewModel.removeMember(user, userId) }
+        val navigationDestinations = remember {
+            listOf(
+                FinanceNavigationDestination(DESTINATION_DASHBOARD, R.string.nav_home, R.drawable.ic_nav_home),
+                FinanceNavigationDestination(
+                    DESTINATION_TRANSACTIONS,
+                    R.string.nav_transactions,
+                    R.drawable.ic_nav_transactions
+                ),
+                FinanceNavigationDestination(DESTINATION_BUDGETS, R.string.nav_budgets, R.drawable.ic_nav_budgets),
+                FinanceNavigationDestination(DESTINATION_USERS, R.string.nav_users, R.drawable.ic_nav_users)
             )
-        } else if (destination == DESTINATION_TRANSACTIONS) {
-            FinanceTransactionsScreen(
-                user = user,
-                state = transactionsState,
-                onBack = { destination = DESTINATION_DASHBOARD },
-                onOpenUsers = { destination = DESTINATION_USERS },
-                onRefresh = { transactionsViewModel.load(user) },
-                onSaveTransaction = transactionsViewModel::saveTransaction,
-                onDeleteTransaction = transactionsViewModel::deleteTransaction,
-                onSaveCategory = transactionsViewModel::saveCategory,
-                onDeactivateCategory = transactionsViewModel::deactivateCategory,
-                onSelectMonth = transactionsViewModel::selectMonth,
-                onSelectKind = transactionsViewModel::selectKind,
-                onSelectMember = transactionsViewModel::selectMember,
-                onClearFilters = transactionsViewModel::clearFilters,
-                onClearMessages = transactionsViewModel::clearMessages
-            )
-        } else if (destination == DESTINATION_BUDGETS) {
-            FinanceBudgetsScreen(
-                user = user,
-                state = budgetsState,
-                onBack = { destination = DESTINATION_DASHBOARD },
-                onOpenUsers = { destination = DESTINATION_USERS },
-                onRefresh = { budgetsViewModel.load(user) },
-                onSaveBudget = budgetsViewModel::saveBudget,
-                onDeleteBudget = budgetsViewModel::deleteBudget,
-                onMoveMonth = budgetsViewModel::moveMonthBy,
-                onClearMessages = budgetsViewModel::clearMessages
-            )
-        } else {
-            DashboardScreen(
-                user = user,
-                isSigningOut = uiState.isSubmitting,
-                onSignOut = {
-                    transactionsViewModel.clearAccountContext()
-                    budgetsViewModel.clearAccountContext()
-                    container.syncScheduler.cancelAccount(user.id)
-                    container.closeFinancialDatabases()
-                    authViewModel.signOut()
-                },
-                onOpenUsers = { destination = DESTINATION_USERS },
-                onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
-                onOpenBudgets = { destination = DESTINATION_BUDGETS }
-            )
+        }
+
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+            ),
+            bottomBar = {
+                FinanceBottomNavigationBar(
+                    selectedDestination = destination,
+                    destinations = navigationDestinations,
+                    onDestinationSelected = { destination = it }
+                )
+            }
+        ) { contentPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding)
+            ) {
+                if (destination == DESTINATION_USERS) {
+                    HouseholdMembersScreen(
+                        user = user,
+                        state = membersState,
+                        onBack = { destination = DESTINATION_DASHBOARD },
+                        onRefresh = { membersViewModel.load(user) },
+                        onCreateHousehold = { membersViewModel.createHousehold(user, it) },
+                        onCreateMember = { email, password, role ->
+                            membersViewModel.createMember(user, email, password, role)
+                        },
+                        onUpdateRole = { userId, role -> membersViewModel.updateRole(user, userId, role) },
+                        onRemoveMember = { userId -> membersViewModel.removeMember(user, userId) }
+                    )
+                } else if (destination == DESTINATION_TRANSACTIONS) {
+                    FinanceTransactionsScreen(
+                        user = user,
+                        state = transactionsState,
+                        onBack = { destination = DESTINATION_DASHBOARD },
+                        onOpenUsers = { destination = DESTINATION_USERS },
+                        onRefresh = { transactionsViewModel.load(user) },
+                        onSaveTransaction = transactionsViewModel::saveTransaction,
+                        onDeleteTransaction = transactionsViewModel::deleteTransaction,
+                        onSaveCategory = transactionsViewModel::saveCategory,
+                        onDeactivateCategory = transactionsViewModel::deactivateCategory,
+                        onSelectMonth = transactionsViewModel::selectMonth,
+                        onSelectKind = transactionsViewModel::selectKind,
+                        onSelectMember = transactionsViewModel::selectMember,
+                        onClearFilters = transactionsViewModel::clearFilters,
+                        onClearMessages = transactionsViewModel::clearMessages
+                    )
+                } else if (destination == DESTINATION_BUDGETS) {
+                    FinanceBudgetsScreen(
+                        user = user,
+                        state = budgetsState,
+                        onBack = { destination = DESTINATION_DASHBOARD },
+                        onOpenUsers = { destination = DESTINATION_USERS },
+                        onRefresh = { budgetsViewModel.load(user) },
+                        onSaveBudget = budgetsViewModel::saveBudget,
+                        onDeleteBudget = budgetsViewModel::deleteBudget,
+                        onMoveMonth = budgetsViewModel::moveMonthBy,
+                        onClearMessages = budgetsViewModel::clearMessages
+                    )
+                } else {
+                    DashboardScreen(
+                        user = user,
+                        isSigningOut = uiState.isSubmitting,
+                        onSignOut = {
+                            transactionsViewModel.clearAccountContext()
+                            budgetsViewModel.clearAccountContext()
+                            container.syncScheduler.cancelAccount(user.id)
+                            container.closeFinancialDatabases()
+                            authViewModel.signOut()
+                        },
+                        onOpenUsers = { destination = DESTINATION_USERS },
+                        onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
+                        onOpenBudgets = { destination = DESTINATION_BUDGETS }
+                    )
+                }
+            }
         }
     } else {
         LoginScreen(
@@ -169,7 +211,9 @@ private fun SessionLoadingScreen() {
         color = MaterialTheme.colorScheme.background
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding(),
             contentAlignment = Alignment.Center
         ) {
             FinanceLoadingState(message = stringResource(R.string.session_loading))

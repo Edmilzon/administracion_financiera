@@ -228,6 +228,10 @@
     <string name="ui_confirm">Confirmar</string>
     <string name="home_sign_out">Cerrar sesión</string>
     <string name="home_signing_out">Cerrando sesión…</string>
+    <string name="nav_home">Inicio</string>
+    <string name="nav_transactions">Movimientos</string>
+    <string name="nav_budgets">Presupuestos</string>
+    <string name="nav_users">Usuarios</string>
     <string name="ui_close">Cerrar</string>
     <plurals name="transactions_results_count">
         <item quantity="one">%1$d resultado</item>
