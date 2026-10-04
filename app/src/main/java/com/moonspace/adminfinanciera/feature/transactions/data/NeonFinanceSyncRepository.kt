@@ -1,6 +1,7 @@
 package com.moonspace.adminfinanciera.feature.transactions.data
 
 import androidx.room.withTransaction
+import com.moonspace.adminfinanciera.core.database.BudgetEntity
 import com.moonspace.adminfinanciera.core.database.CategoryEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
 import com.moonspace.adminfinanciera.core.database.FinanceDatabase
@@ -78,6 +79,14 @@ class NeonFinanceSyncRepository(
                 "household_id" to "eq.$householdId"
             )
         ).map { it.toCategory(accountId) }
+        val remoteBudgets = requestRows(
+            resource = BUDGETS_RESOURCE,
+            query = buildMap {
+                put("select", BUDGET_COLUMNS)
+                put("household_id", "eq.$householdId")
+                if (role == ROLE_MEMBER) put("user_id", "eq.$accountId")
+            }
+        ).map { it.toBudget(accountId) }
         val remoteMarkers = requestRows(
             resource = DELETION_MARKERS_RESOURCE,
             query = mapOf(
@@ -102,6 +111,7 @@ class NeonFinanceSyncRepository(
             householdId = householdId,
             role = role,
             categories = remoteCategories,
+            budgets = remoteBudgets,
             transactions = remoteTransactions,
             deletedTransactionIds = remoteMarkers.mapNotNull { it.optString("transaction_id").takeIf(String::isNotBlank) }.toSet(),
             previousSuccessfulSyncAt = lastSyncAt,
@@ -112,7 +122,8 @@ class NeonFinanceSyncRepository(
             database = database,
             accountId = accountId,
             householdId = householdId,
-            remoteCategoryIds = remoteCategories.mapTo(mutableSetOf(), CategoryEntity::id)
+            remoteCategoryIds = remoteCategories.mapTo(mutableSetOf(), CategoryEntity::id),
+            remoteBudgetIds = remoteBudgets.mapTo(mutableSetOf(), BudgetEntity::id)
         )
         database.syncStateDao().save(
             SyncStateEntity(
@@ -129,6 +140,7 @@ class NeonFinanceSyncRepository(
         householdId: String,
         role: String,
         categories: List<CategoryEntity>,
+        budgets: List<BudgetEntity>,
         transactions: List<TransactionEntity>,
         deletedTransactionIds: Set<String>,
         previousSuccessfulSyncAt: Long?,
@@ -136,10 +148,12 @@ class NeonFinanceSyncRepository(
         syncedAt: Long
     ) {
         val categoryDao = database.categoryDao()
+        val budgetDao = database.budgetDao()
         val transactionDao = database.transactionDao()
         val outboxDao = database.syncOutboxDao()
         val deletionMarkerDao = database.transactionDeletionMarkerDao()
         val remoteCategoryById = categories.associateBy(CategoryEntity::id)
+        val remoteBudgetById = budgets.associateBy(BudgetEntity::id)
         val remoteTransactionById = transactions.associateBy(TransactionEntity::id)
 
         database.withTransaction {
@@ -151,8 +165,10 @@ class NeonFinanceSyncRepository(
 
             if (role == ROLE_MEMBER) {
                 transactionDao.removeOthers(householdId, accountId)
+                budgetDao.removeOthers(householdId, accountId)
             }
 
+            val localBudgetsBeforeImport = budgetDao.allForHousehold(householdId)
             val localTransactionsBeforeImport = transactionDao.allForHousehold(householdId)
             val queuedBeforeImport = outboxDao.pending(accountId).associateBy { it.entityType to it.entityId }
 
@@ -169,6 +185,30 @@ class NeonFinanceSyncRepository(
                         outboxDao.removeById(pendingCategory.id)
                     }
                     categoryDao.upsert(remoteCategory)
+                }
+            }
+
+            budgets.forEach { remoteBudget ->
+                if (queuedBeforeImport[ENTITY_BUDGET to remoteBudget.id] == null) {
+                    budgetDao.save(remoteBudget)
+                }
+            }
+
+            localBudgetsBeforeImport.forEach { localBudget ->
+                if (localBudget.id in remoteBudgetById) return@forEach
+                val pending = queuedBeforeImport[ENTITY_BUDGET to localBudget.id]
+                if (pending == null) {
+                    budgetDao.deleteById(householdId, localBudget.id)
+                    return@forEach
+                }
+
+                val wasBasedOnPreviousSnapshot = previousSuccessfulSyncAt != null &&
+                    localBudget.updatedAt <= previousSuccessfulSyncAt
+                if (localBudget.isRemoteBacked && wasBasedOnPreviousSnapshot &&
+                    pending.operation == OPERATION_UPSERT
+                ) {
+                    budgetDao.deleteById(householdId, localBudget.id)
+                    outboxDao.removeForEntity(accountId, ENTITY_BUDGET, localBudget.id)
                 }
             }
 
@@ -215,13 +255,22 @@ class NeonFinanceSyncRepository(
         database: FinanceDatabase,
         accountId: String,
         householdId: String,
-        remoteCategoryIds: MutableSet<String>
+        remoteCategoryIds: MutableSet<String>,
+        remoteBudgetIds: MutableSet<String>
     ) {
         val outboxDao = database.syncOutboxDao()
         var sentCount = 0
         while (true) {
             val pending = outboxDao.pending(accountId)
-                .sortedWith(compareBy<SyncOutboxEntity>({ if (it.entityType == ENTITY_CATEGORY) 0 else 1 }, SyncOutboxEntity::enqueuedAt))
+                .sortedWith(
+                    compareBy<SyncOutboxEntity> {
+                        when (it.entityType) {
+                            ENTITY_CATEGORY -> 0
+                            ENTITY_BUDGET -> 1
+                            else -> 2
+                        }
+                    }.thenBy(SyncOutboxEntity::enqueuedAt)
+                )
             if (pending.isEmpty()) return
             if (sentCount >= MAX_OPERATIONS_PER_RUN) {
                 throw IOException("The finance sync batch limit was reached; remaining changes will be retried.")
@@ -231,6 +280,7 @@ class NeonFinanceSyncRepository(
                 if (operation.accountId != accountId) return@forEach
                 when (operation.entityType) {
                     ENTITY_CATEGORY -> sendCategoryOperation(database, householdId, operation, remoteCategoryIds)
+                    ENTITY_BUDGET -> sendBudgetOperation(database, accountId, householdId, operation, remoteBudgetIds)
                     ENTITY_TRANSACTION -> sendTransactionOperation(database, accountId, householdId, operation)
                     else -> throw IOException("Unsupported queued finance entity type.")
                 }
@@ -275,6 +325,59 @@ class NeonFinanceSyncRepository(
             remoteCategoryIds += category.id
         }
         database.syncOutboxDao().removeById(operation.id)
+    }
+
+    private suspend fun sendBudgetOperation(
+        database: FinanceDatabase,
+        accountId: String,
+        householdId: String,
+        operation: SyncOutboxEntity,
+        remoteBudgetIds: MutableSet<String>
+    ) {
+        val budgetDao = database.budgetDao()
+        if (operation.operation == OPERATION_DELETE) {
+            request(
+                resource = BUDGETS_RESOURCE,
+                method = NeonDataApiMethod.DELETE,
+                query = mapOf(
+                    "id" to "eq.${operation.entityId}",
+                    "household_id" to "eq.$householdId",
+                    "user_id" to "eq.$accountId"
+                )
+            )
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        if (operation.operation != OPERATION_UPSERT) {
+            throw IOException("Unsupported budget operation in the finance sync queue.")
+        }
+
+        val budget = budgetDao.findById(householdId, operation.entityId)
+        if (budget == null || budget.userId != accountId) {
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        val alreadyRemote = budget.id in remoteBudgetIds
+        request(
+            resource = BUDGETS_RESOURCE,
+            method = if (alreadyRemote) NeonDataApiMethod.PATCH else NeonDataApiMethod.POST,
+            query = if (alreadyRemote) {
+                mapOf(
+                    "id" to "eq.${budget.id}",
+                    "household_id" to "eq.$householdId",
+                    "user_id" to "eq.$accountId"
+                )
+            } else {
+                mapOf("on_conflict" to "id")
+            },
+            body = budget.toJson(),
+            prefer = if (alreadyRemote) null else UPSERT_PREFER
+        )
+        remoteBudgetIds += budget.id
+        database.withTransaction {
+            budgetDao.markRemoteBacked(householdId, budget.id)
+            database.syncOutboxDao().removeById(operation.id)
+        }
     }
 
     private suspend fun sendTransactionOperation(
@@ -390,6 +493,23 @@ class NeonFinanceSyncRepository(
         )
     }
 
+    private fun JSONObject.toBudget(accountId: String): BudgetEntity {
+        val categoryId = optNullableString("category_id")
+        return BudgetEntity(
+            id = getString("id"),
+            accountId = accountId,
+            householdId = getString("household_id"),
+            userId = getString("user_id"),
+            categoryId = categoryId,
+            categoryKey = categoryId ?: GENERAL_CATEGORY_KEY,
+            monthStart = getString("month_start"),
+            amountCentavos = getBigDecimal("amount_limit").movePointRight(2).longValueExact(),
+            createdAt = getInstantMillis("created_at"),
+            updatedAt = getInstantMillis("updated_at"),
+            isRemoteBacked = true
+        )
+    }
+
     private fun JSONObject.toTransaction(accountId: String): TransactionEntity = TransactionEntity(
         id = getString("id"),
         accountId = accountId,
@@ -463,6 +583,14 @@ class NeonFinanceSyncRepository(
         .put("created_at", formatTimestamp(createdAt))
         .put("updated_at", formatTimestamp(updatedAt))
 
+    private fun BudgetEntity.toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("household_id", householdId)
+        .put("user_id", userId)
+        .put("category_id", categoryId ?: JSONObject.NULL)
+        .put("month_start", monthStart)
+        .put("amount_limit", BigDecimal.valueOf(amountCentavos, 2).toPlainString())
+
     private fun formatTimestamp(timestampMillis: Long): String = timestampFormatter().format(Date(timestampMillis))
 
     private fun timestampParser() = SimpleDateFormat(TIMESTAMP_PATTERN_FORMAT, Locale.ROOT).apply {
@@ -477,19 +605,23 @@ class NeonFinanceSyncRepository(
     companion object {
         private const val HOUSEHOLD_MEMBERS_RESOURCE = "household_members"
         private const val CATEGORIES_RESOURCE = "categories"
+        private const val BUDGETS_RESOURCE = "budgets"
         private const val TRANSACTIONS_RESOURCE = "transactions"
         private const val DELETION_MARKERS_RESOURCE = "transaction_deletion_markers"
         private const val RPC_RESOURCE = "rpc"
         private const val PRUNE_MARKERS_RPC = "prune_expired_transaction_deletion_markers"
         private const val CATEGORY_COLUMNS = "id,household_id,created_by,name,kind,is_active,created_at,updated_at"
+        private const val BUDGET_COLUMNS = "id,household_id,user_id,category_id,month_start,amount_limit::text,created_at,updated_at"
         private const val TRANSACTION_COLUMNS = "id,household_id,created_by,category_id,kind,amount::text,currency,occurred_on,description,created_at,updated_at"
         private const val DELETION_MARKER_COLUMNS = "transaction_id,household_id,created_by,deleted_at"
         private const val ENTITY_CATEGORY = "category"
+        private const val ENTITY_BUDGET = "budget"
         private const val ENTITY_TRANSACTION = "transaction"
         private const val OPERATION_UPSERT = "upsert"
         private const val OPERATION_DELETE = "delete"
         private const val ROLE_ADMIN = "admin"
         private const val ROLE_MEMBER = "member"
+        private const val GENERAL_CATEGORY_KEY = "__general__"
         private const val UPSERT_PREFER = "resolution=merge-duplicates,return=minimal"
         private const val PAGE_SIZE = 500
         private const val MAX_OPERATIONS_PER_RUN = 500

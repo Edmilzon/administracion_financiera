@@ -13,6 +13,8 @@ import com.moonspace.adminfinanciera.feature.users.data.NeonHouseholdMembersRepo
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdMembersRepository
 import com.moonspace.adminfinanciera.feature.transactions.data.RoomFinancialRepository
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinancialRepository
+import com.moonspace.adminfinanciera.feature.budgets.data.RoomBudgetRepository
+import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetRepository
 
 class FinanceAppContainer(context: Context) {
     val financeDatabases = EncryptedFinanceDatabaseProvider(context.applicationContext)
@@ -32,6 +34,7 @@ class FinanceAppContainer(context: Context) {
         databases = financeDatabases
     )
     val financialRepository: FinancialRepository = RoomFinancialRepository(financeDatabases, syncScheduler)
+    val budgetRepository: BudgetRepository = RoomBudgetRepository(financeDatabases, syncScheduler)
     val financeSyncRepository = NeonFinanceSyncRepository(
         config = neonApiConfig,
         dataApiClient = dataApiClient,

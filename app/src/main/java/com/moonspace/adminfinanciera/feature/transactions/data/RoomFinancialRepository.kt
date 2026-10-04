@@ -80,12 +80,14 @@ class RoomFinancialRepository(
                 )
                 if (cached?.householdId != null && cached.householdId != householdId) {
                     database.transactionDao().deleteForHousehold(cached.householdId)
+                    database.budgetDao().deleteForHousehold(cached.householdId)
                     database.categoryDao().deleteForHousehold(cached.householdId)
                     database.syncOutboxDao().clearAccount(accountId)
                     database.transactionDeletionMarkerDao().clearAll()
                 }
                 if (role == ROLE_MEMBER) {
                     database.transactionDao().removeOthers(householdId, accountId)
+                    database.budgetDao().removeOthers(householdId, accountId)
                 }
             }
 

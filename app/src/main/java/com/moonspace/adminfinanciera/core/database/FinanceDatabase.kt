@@ -154,6 +154,47 @@ data class SyncStateEntity(
     val lastSuccessfulSyncAt: Long
 )
 
+@Entity(
+    tableName = "budgets",
+    indices = [
+        Index("account_id"),
+        Index(value = ["household_id", "category_id"]),
+        Index(value = ["household_id", "user_id", "month_start"]),
+        Index(
+            value = ["account_id", "household_id", "user_id", "month_start", "category_key"],
+            unique = true
+        )
+    ],
+    foreignKeys = [
+        ForeignKey(
+            entity = HouseholdCacheEntity::class,
+            parentColumns = ["account_id"],
+            childColumns = ["account_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["household_id", "id"],
+            childColumns = ["household_id", "category_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ]
+)
+data class BudgetEntity(
+    @PrimaryKey val id: String,
+    @androidx.room.ColumnInfo(name = "account_id") val accountId: String,
+    @androidx.room.ColumnInfo(name = "household_id") val householdId: String,
+    @androidx.room.ColumnInfo(name = "user_id") val userId: String,
+    @androidx.room.ColumnInfo(name = "category_id") val categoryId: String?,
+    @androidx.room.ColumnInfo(name = "category_key") val categoryKey: String,
+    @androidx.room.ColumnInfo(name = "month_start") val monthStart: String,
+    @androidx.room.ColumnInfo(name = "amount_centavos") val amountCentavos: Long,
+    @androidx.room.ColumnInfo(name = "created_at") val createdAt: Long,
+    @androidx.room.ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @androidx.room.ColumnInfo(name = "is_remote_backed", defaultValue = "0")
+    val isRemoteBacked: Boolean = false
+)
+
 @Dao
 interface HouseholdCacheDao {
     @Query("SELECT * FROM household_cache WHERE account_id = :accountId LIMIT 1")
@@ -324,17 +365,56 @@ interface SyncStateDao {
     suspend fun save(entity: SyncStateEntity)
 }
 
+@Dao
+interface BudgetDao {
+    @Query("SELECT * FROM budgets WHERE household_id = :householdId AND month_start = :monthStart ORDER BY user_id, category_key")
+    fun observeAllForMonth(householdId: String, monthStart: String): Flow<List<BudgetEntity>>
+
+    @Query("SELECT * FROM budgets WHERE household_id = :householdId AND user_id = :userId AND month_start = :monthStart ORDER BY category_key")
+    fun observeOwnForMonth(householdId: String, userId: String, monthStart: String): Flow<List<BudgetEntity>>
+
+    @Query("SELECT * FROM budgets WHERE id = :budgetId AND household_id = :householdId LIMIT 1")
+    suspend fun findById(householdId: String, budgetId: String): BudgetEntity?
+
+    @Query("SELECT * FROM budgets WHERE household_id = :householdId AND user_id = :userId AND month_start = :monthStart AND category_key = :categoryKey LIMIT 1")
+    suspend fun findForScope(
+        householdId: String,
+        userId: String,
+        monthStart: String,
+        categoryKey: String
+    ): BudgetEntity?
+
+    @Query("SELECT * FROM budgets WHERE household_id = :householdId")
+    suspend fun allForHousehold(householdId: String): List<BudgetEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(entity: BudgetEntity)
+
+    @Query("DELETE FROM budgets WHERE household_id = :householdId AND id = :budgetId")
+    suspend fun deleteById(householdId: String, budgetId: String)
+
+    @Query("DELETE FROM budgets WHERE household_id = :householdId")
+    suspend fun deleteForHousehold(householdId: String)
+
+    @Query("DELETE FROM budgets WHERE household_id = :householdId AND user_id != :userId")
+    suspend fun removeOthers(householdId: String, userId: String)
+
+    @Query("UPDATE budgets SET is_remote_backed = 1 WHERE id = :budgetId AND household_id = :householdId")
+    suspend fun markRemoteBacked(householdId: String, budgetId: String)
+}
+
 @Database(
     entities = [
         HouseholdCacheEntity::class,
         HouseholdMemberCacheEntity::class,
         CategoryEntity::class,
         TransactionEntity::class,
+        BudgetEntity::class,
         SyncOutboxEntity::class,
         TransactionDeletionMarkerEntity::class,
         SyncStateEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -342,6 +422,7 @@ abstract class FinanceDatabase : RoomDatabase() {
     abstract fun householdCacheDao(): HouseholdCacheDao
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
+    abstract fun budgetDao(): BudgetDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun transactionDeletionMarkerDao(): TransactionDeletionMarkerDao
 
@@ -362,6 +443,37 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE `transactions` ADD COLUMN `is_remote_backed` " +
                         "INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `budgets` (" +
+                        "`id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `household_id` TEXT NOT NULL, " +
+                        "`user_id` TEXT NOT NULL, `category_id` TEXT, `category_key` TEXT NOT NULL, " +
+                        "`month_start` TEXT NOT NULL, `amount_centavos` INTEGER NOT NULL, " +
+                        "`created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, " +
+                        "`is_remote_backed` INTEGER NOT NULL DEFAULT 0, " +
+                        "PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`account_id`) REFERENCES `household_cache`(`account_id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                        "FOREIGN KEY(`household_id`, `category_id`) REFERENCES `categories`(`household_id`, `id`) " +
+                        "ON UPDATE NO ACTION ON DELETE RESTRICT)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_budgets_account_id` ON `budgets` (`account_id`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_budgets_household_id_category_id` " +
+                        "ON `budgets` (`household_id`, `category_id`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_budgets_household_id_user_id_month_start` " +
+                        "ON `budgets` (`household_id`, `user_id`, `month_start`)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_account_id_household_id_user_id_month_start_category_key` " +
+                        "ON `budgets` (`account_id`, `household_id`, `user_id`, `month_start`, `category_key`)"
                 )
             }
         }

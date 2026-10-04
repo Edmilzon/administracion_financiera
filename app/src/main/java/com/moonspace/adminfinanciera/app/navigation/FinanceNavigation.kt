@@ -23,6 +23,8 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
 import com.moonspace.adminfinanciera.feature.auth.presentation.AuthViewModel
 import com.moonspace.adminfinanciera.feature.auth.presentation.LoginScreen
 import com.moonspace.adminfinanciera.feature.dashboard.presentation.DashboardScreen
+import com.moonspace.adminfinanciera.feature.budgets.presentation.FinanceBudgetsScreen
+import com.moonspace.adminfinanciera.feature.budgets.presentation.FinanceBudgetsViewModel
 import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsScreen
 import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsViewModel
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersScreen
@@ -64,12 +66,24 @@ fun FinanceNavigation() {
             }
         )
         val transactionsState by transactionsViewModel.uiState.collectAsStateWithLifecycle()
+        val budgetsViewModel: FinanceBudgetsViewModel = viewModel(
+            factory = remember(container) {
+                FinanceBudgetsViewModel.Factory(
+                    context,
+                    container.householdMembersRepository,
+                    container.financialRepository,
+                    container.budgetRepository
+                )
+            }
+        )
+        val budgetsState by budgetsViewModel.uiState.collectAsStateWithLifecycle()
         var destination by rememberSaveable(user.id) { mutableStateOf("dashboard") }
 
         LaunchedEffect(user.id, destination) {
             when (destination) {
                 DESTINATION_USERS -> membersViewModel.load(user)
                 DESTINATION_TRANSACTIONS -> transactionsViewModel.load(user)
+                DESTINATION_BUDGETS -> budgetsViewModel.load(user)
             }
         }
 
@@ -103,18 +117,32 @@ fun FinanceNavigation() {
                 onClearFilters = transactionsViewModel::clearFilters,
                 onClearMessages = transactionsViewModel::clearMessages
             )
+        } else if (destination == DESTINATION_BUDGETS) {
+            FinanceBudgetsScreen(
+                user = user,
+                state = budgetsState,
+                onBack = { destination = DESTINATION_DASHBOARD },
+                onOpenUsers = { destination = DESTINATION_USERS },
+                onRefresh = { budgetsViewModel.load(user) },
+                onSaveBudget = budgetsViewModel::saveBudget,
+                onDeleteBudget = budgetsViewModel::deleteBudget,
+                onMoveMonth = budgetsViewModel::moveMonthBy,
+                onClearMessages = budgetsViewModel::clearMessages
+            )
         } else {
             DashboardScreen(
                 user = user,
                 isSigningOut = uiState.isSubmitting,
                 onSignOut = {
                     transactionsViewModel.clearAccountContext()
+                    budgetsViewModel.clearAccountContext()
                     container.syncScheduler.cancelAccount(user.id)
                     container.closeFinancialDatabases()
                     authViewModel.signOut()
                 },
                 onOpenUsers = { destination = DESTINATION_USERS },
-                onOpenTransactions = { destination = DESTINATION_TRANSACTIONS }
+                onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
+                onOpenBudgets = { destination = DESTINATION_BUDGETS }
             )
         }
     } else {
@@ -132,6 +160,7 @@ fun FinanceNavigation() {
 private const val DESTINATION_DASHBOARD = "dashboard"
 private const val DESTINATION_USERS = "users"
 private const val DESTINATION_TRANSACTIONS = "transactions"
+private const val DESTINATION_BUDGETS = "budgets"
 
 @Composable
 private fun SessionLoadingScreen() {

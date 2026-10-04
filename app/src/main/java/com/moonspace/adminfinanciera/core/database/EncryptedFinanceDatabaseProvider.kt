@@ -34,7 +34,11 @@ class EncryptedFinanceDatabaseProvider(context: Context) {
                     FinanceDatabase::class.java,
                     "finance_$accountHash.db"
                 ).openHelperFactory(factory)
-                    .addMigrations(FinanceDatabase.MIGRATION_1_2, FinanceDatabase.MIGRATION_2_3)
+            .addMigrations(
+                FinanceDatabase.MIGRATION_1_2,
+                FinanceDatabase.MIGRATION_2_3,
+                FinanceDatabase.MIGRATION_3_4
+            )
                     .build(),
                 passphrase = passphrase
             )
