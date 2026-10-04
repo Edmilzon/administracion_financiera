@@ -42,7 +42,7 @@ class NeonHouseholdMembersRepository(
         val snapshot = try {
             loadRemote(currentUser)
         } catch (error: UserManagementException) {
-            if (error.cause is IOException && cached != null) return cached
+            if (cached != null && error.canUseCachedSnapshot()) return cached
             throw error
         }
 
@@ -165,7 +165,8 @@ class NeonHouseholdMembersRepository(
         } catch (error: UserManagementException) {
             throw UserManagementException(
                 appContext.getString(R.string.users_account_created_not_linked),
-                error
+                error,
+                error.httpStatusCode
             )
         }
 
@@ -223,7 +224,10 @@ class NeonHouseholdMembersRepository(
             when (response.statusCode) {
                 401, 403 -> fail(R.string.users_permission_denied)
                 409 -> fail(R.string.users_member_already_linked)
-                else -> fail(R.string.users_request_failed)
+                else -> throw UserManagementException(
+                    appContext.getString(R.string.users_http_error, response.statusCode),
+                    httpStatusCode = response.statusCode
+                )
             }
         }
         return response
@@ -256,4 +260,8 @@ class NeonHouseholdMembersRepository(
 
     private fun fail(messageResource: Int): Nothing =
         throw UserManagementException(appContext.getString(messageResource))
+
+    private fun UserManagementException.canUseCachedSnapshot(): Boolean =
+        cause is IOException || httpStatusCode == 404 || httpStatusCode == 408 ||
+            httpStatusCode == 429 || (httpStatusCode != null && httpStatusCode >= 500)
 }

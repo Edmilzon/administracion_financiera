@@ -95,6 +95,7 @@
     <string name="users_member_removed">Integrante quitado del espacio. Su cuenta Neon sigue activa.</string>
     <string name="users_request_failed">No se pudo completar la solicitud. Revisa la configuración e inténtalo de nuevo.</string>
     <string name="users_connection_failed">No se pudo conectar con Neon. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="users_http_error">Neon respondió con HTTP %1$d. Revisa que las migraciones y la Data API estén configuradas.</string>
     <string name="users_invalid_response">Neon devolvió una respuesta que la app no pudo interpretar.</string>
     <string name="transactions_back">Volver al menú</string>
     <string name="transactions_title">Movimientos</string>

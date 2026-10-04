@@ -28,7 +28,11 @@ data class MemberCreationResult(
     val emailVerificationRequired: Boolean
 )
 
-class UserManagementException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class UserManagementException(
+    message: String,
+    cause: Throwable? = null,
+    val httpStatusCode: Int? = null
+) : Exception(message, cause)
 
 interface HouseholdMembersRepository {
     suspend fun load(currentUser: AuthUser): HouseholdSnapshot
