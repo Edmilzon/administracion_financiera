@@ -49,6 +49,8 @@ import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembers
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersViewModel
 import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecurringScreen
 import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecurringViewModel
+import com.moonspace.adminfinanciera.feature.reports.presentation.FinanceReportsScreen
+import com.moonspace.adminfinanciera.feature.reports.presentation.FinanceReportsViewModel
 
 @Composable
 fun FinanceNavigation() {
@@ -114,6 +116,17 @@ fun FinanceNavigation() {
             }
         )
         val recurringState by recurringViewModel.uiState.collectAsStateWithLifecycle()
+        val reportsViewModel: FinanceReportsViewModel = viewModel(
+            factory = remember(container) {
+                FinanceReportsViewModel.Factory(
+                    context,
+                    container.householdMembersRepository,
+                    container.financialRepository,
+                    container.financeReportDocumentGenerator
+                )
+            }
+        )
+        val reportsState by reportsViewModel.uiState.collectAsStateWithLifecycle()
         var destination by rememberSaveable(user.id) {
             mutableStateOf(
                 if (activity?.intent?.getBooleanExtra(com.moonspace.adminfinanciera.app.MainActivity.EXTRA_OPEN_RECURRING, false) == true) {
@@ -130,6 +143,7 @@ fun FinanceNavigation() {
                 DESTINATION_USERS -> membersViewModel.load(user)
                 DESTINATION_TRANSACTIONS -> transactionsViewModel.load(user)
                 DESTINATION_BUDGETS -> budgetsViewModel.load(user)
+                DESTINATION_REPORTS -> reportsViewModel.load(user)
                 DESTINATION_RECURRING -> {
                     recurringViewModel.load(user)
                     if (!askedForNotificationPermission) {
@@ -160,6 +174,11 @@ fun FinanceNavigation() {
                     DESTINATION_RECURRING,
                     R.string.nav_recurring,
                     R.drawable.ic_nav_recurring
+                ),
+                FinanceNavigationDestination(
+                    DESTINATION_REPORTS,
+                    R.string.nav_reports,
+                    R.drawable.ic_nav_reports
                 ),
                 FinanceNavigationDestination(DESTINATION_USERS, R.string.nav_users, R.drawable.ic_nav_users)
             )
@@ -237,6 +256,20 @@ fun FinanceNavigation() {
                         onConfirmOccurrence = recurringViewModel::confirmOccurrence,
                         onClearMessages = recurringViewModel::clearMessages
                     )
+                } else if (destination == DESTINATION_REPORTS) {
+                    FinanceReportsScreen(
+                        state = reportsState,
+                        onBack = { destination = DESTINATION_DASHBOARD },
+                        onRefresh = { reportsViewModel.load(user) },
+                        onSelectStartDate = reportsViewModel::selectStartDate,
+                        onSelectEndDate = reportsViewModel::selectEndDate,
+                        onSelectKind = reportsViewModel::selectKind,
+                        onSelectCategory = reportsViewModel::selectCategory,
+                        onSelectMember = reportsViewModel::selectMember,
+                        onResetFilters = reportsViewModel::resetFilters,
+                        onGenerate = reportsViewModel::generate,
+                        onDeliveryFailed = reportsViewModel::reportDeliveryFailed
+                    )
                 } else {
                     DashboardScreen(
                         user = user,
@@ -245,6 +278,7 @@ fun FinanceNavigation() {
                             transactionsViewModel.clearAccountContext()
                             budgetsViewModel.clearAccountContext()
                             recurringViewModel.clearAccountContext()
+                            reportsViewModel.clearAccountContext()
                             container.syncScheduler.cancelAccount(user.id)
                             container.recurringReminderScheduler.cancelAccount(user.id)
                             container.closeFinancialDatabases()
@@ -253,7 +287,8 @@ fun FinanceNavigation() {
                         onOpenUsers = { destination = DESTINATION_USERS },
                         onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
                         onOpenBudgets = { destination = DESTINATION_BUDGETS },
-                        onOpenRecurring = { destination = DESTINATION_RECURRING }
+                        onOpenRecurring = { destination = DESTINATION_RECURRING },
+                        onOpenReports = { destination = DESTINATION_REPORTS }
                     )
                 }
             }
@@ -275,6 +310,7 @@ private const val DESTINATION_USERS = "users"
 private const val DESTINATION_TRANSACTIONS = "transactions"
 private const val DESTINATION_BUDGETS = "budgets"
 private const val DESTINATION_RECURRING = "recurring"
+private const val DESTINATION_REPORTS = "reports"
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

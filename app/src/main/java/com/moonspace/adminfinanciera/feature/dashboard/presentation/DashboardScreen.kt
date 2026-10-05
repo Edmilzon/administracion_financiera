@@ -38,7 +38,8 @@ fun DashboardScreen(
     onOpenUsers: () -> Unit,
     onOpenTransactions: () -> Unit,
     onOpenBudgets: () -> Unit,
-    onOpenRecurring: () -> Unit
+    onOpenRecurring: () -> Unit,
+    onOpenReports: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -134,7 +135,8 @@ fun DashboardScreen(
             MenuTile(
                 number = "04",
                 title = stringResource(R.string.menu_reports),
-                description = stringResource(R.string.menu_reports_description)
+                description = stringResource(R.string.menu_reports_description),
+                onClick = onOpenReports
             )
             MenuTile(
                 number = "05",

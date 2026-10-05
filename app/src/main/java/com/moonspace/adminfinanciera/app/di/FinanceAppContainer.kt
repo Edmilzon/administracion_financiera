@@ -18,20 +18,23 @@ import com.moonspace.adminfinanciera.feature.budgets.data.RoomBudgetRepository
 import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetRepository
 import com.moonspace.adminfinanciera.feature.recurring.data.RoomRecurringRuleRepository
 import com.moonspace.adminfinanciera.feature.recurring.domain.RecurringRuleRepository
+import com.moonspace.adminfinanciera.feature.reports.data.FinanceReportDocumentGenerator
 
 class FinanceAppContainer(context: Context) {
-    val financeDatabases = EncryptedFinanceDatabaseProvider(context.applicationContext)
-    val syncScheduler = FinanceSyncScheduler(context.applicationContext)
-    val recurringReminderScheduler = RecurringReminderScheduler(context.applicationContext)
+    private val appContext = context.applicationContext
+    val financeDatabases = EncryptedFinanceDatabaseProvider(appContext)
+    val syncScheduler = FinanceSyncScheduler(appContext)
+    val recurringReminderScheduler = RecurringReminderScheduler(appContext)
+    val financeReportDocumentGenerator = FinanceReportDocumentGenerator(appContext.cacheDir)
     val neonApiConfig = NeonApiConfig(
         authBaseUrl = BuildConfig.NEON_AUTH_BASE_URL,
         dataApiBaseUrl = BuildConfig.NEON_DATA_API_URL
     )
-    private val neonAuthRepository = NeonAuthRepository(context.applicationContext, neonApiConfig)
+    private val neonAuthRepository = NeonAuthRepository(appContext, neonApiConfig)
     val authRepository: AuthRepository = neonAuthRepository
     val dataApiClient = NeonDataApiClient(neonApiConfig, neonAuthRepository)
     val householdMembersRepository: HouseholdMembersRepository = NeonHouseholdMembersRepository(
-        context = context.applicationContext,
+        context = appContext,
         config = neonApiConfig,
         dataApiClient = dataApiClient,
         authRepository = authRepository,
