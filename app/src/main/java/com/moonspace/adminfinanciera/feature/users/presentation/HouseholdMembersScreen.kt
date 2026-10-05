@@ -538,88 +538,92 @@ private fun CreateMemberSheet(
         title = stringResource(R.string.users_add_title),
         onDismissRequest = onDismiss
     ) {
-        Text(
-            text = stringResource(R.string.users_add_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(FinanceSpacing.Medium))
-        FinanceTextField(
-            value = email,
-            onValueChange = {
-                email = it
-                emailTouched = true
-            },
-            label = stringResource(R.string.login_email_label),
-            enabled = !isSubmitting,
-            isError = emailTouched && email.isNotBlank() && !validEmail,
-            supportingText = if (emailTouched && email.isNotBlank() && !validEmail) {
-                stringResource(R.string.login_invalid_email)
-            } else null,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next,
-                autoCorrectEnabled = false
-            )
-        )
-        FinancePasswordField(
-            value = password,
-            onValueChange = { password = it },
-            label = stringResource(R.string.users_initial_password_label),
-            enabled = !isSubmitting,
-            isError = password.isNotEmpty() && password.length < MIN_PASSWORD_LENGTH,
-            supportingText = stringResource(R.string.auth_password_rule)
-        )
-        FinancePasswordField(
-            value = confirmation,
-            onValueChange = { confirmation = it },
-            label = stringResource(R.string.auth_confirm_password_label),
-            enabled = !isSubmitting,
-            isError = confirmation.isNotEmpty() && !passwordsMatch,
-            supportingText = if (confirmation.isNotEmpty() && !passwordsMatch) {
-                stringResource(R.string.auth_password_mismatch)
-            } else null,
-            showVisibilityControl = false
-        )
-        Text(
-            text = stringResource(R.string.users_initial_password_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = stringResource(R.string.users_role_label),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-            FinanceButton(
-                label = stringResource(R.string.users_role_member),
-                onClick = { role = HouseholdRole.Member },
-                modifier = Modifier.weight(1f),
-                variant = if (role == HouseholdRole.Member) FinanceButtonVariant.Primary
-                else FinanceButtonVariant.Secondary,
-                enabled = !isSubmitting
-            )
-            FinanceButton(
-                label = stringResource(R.string.users_role_admin),
-                onClick = { role = HouseholdRole.Admin },
-                modifier = Modifier.weight(1f),
-                variant = if (role == HouseholdRole.Admin) FinanceButtonVariant.Primary
-                else FinanceButtonVariant.Secondary,
-                enabled = !isSubmitting
-            )
-        }
-        errorMessage?.let { message ->
-            FinanceStatusBanner(message = message, tone = FinanceStatusTone.Error)
-        }
-        FinanceButton(
-            label = stringResource(R.string.users_create_action),
-            onClick = { onCreate(normalizedEmail, password, role) },
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            enabled = canSubmit,
-            isLoading = isSubmitting,
-            loadingLabel = stringResource(R.string.users_creating)
-        )
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
+        ) {
+            Text(
+                text = stringResource(R.string.users_add_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FinanceTextField(
+                value = email,
+                onValueChange = {
+                    email = it
+                    emailTouched = true
+                },
+                label = stringResource(R.string.login_email_label),
+                enabled = !isSubmitting,
+                isError = emailTouched && email.isNotBlank() && !validEmail,
+                supportingText = if (emailTouched && email.isNotBlank() && !validEmail) {
+                    stringResource(R.string.login_invalid_email)
+                } else null,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction = ImeAction.Next,
+                    autoCorrectEnabled = false
+                )
+            )
+            FinancePasswordField(
+                value = password,
+                onValueChange = { password = it },
+                label = stringResource(R.string.users_initial_password_label),
+                enabled = !isSubmitting,
+                isError = password.isNotEmpty() && password.length < MIN_PASSWORD_LENGTH,
+                supportingText = stringResource(R.string.auth_password_rule)
+            )
+            FinancePasswordField(
+                value = confirmation,
+                onValueChange = { confirmation = it },
+                label = stringResource(R.string.auth_confirm_password_label),
+                enabled = !isSubmitting,
+                isError = confirmation.isNotEmpty() && !passwordsMatch,
+                supportingText = if (confirmation.isNotEmpty() && !passwordsMatch) {
+                    stringResource(R.string.auth_password_mismatch)
+                } else null,
+                showVisibilityControl = false
+            )
+            Text(
+                text = stringResource(R.string.users_initial_password_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = stringResource(R.string.users_role_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
+                FinanceButton(
+                    label = stringResource(R.string.users_role_member),
+                    onClick = { role = HouseholdRole.Member },
+                    modifier = Modifier.weight(1f),
+                    variant = if (role == HouseholdRole.Member) FinanceButtonVariant.Primary
+                    else FinanceButtonVariant.Secondary,
+                    enabled = !isSubmitting
+                )
+                FinanceButton(
+                    label = stringResource(R.string.users_role_admin),
+                    onClick = { role = HouseholdRole.Admin },
+                    modifier = Modifier.weight(1f),
+                    variant = if (role == HouseholdRole.Admin) FinanceButtonVariant.Primary
+                    else FinanceButtonVariant.Secondary,
+                    enabled = !isSubmitting
+                )
+            }
+            errorMessage?.let { message ->
+                FinanceStatusBanner(message = message, tone = FinanceStatusTone.Error)
+            }
+            FinanceButton(
+                label = stringResource(R.string.users_create_action),
+                onClick = { onCreate(normalizedEmail, password, role) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canSubmit,
+                isLoading = isSubmitting,
+                loadingLabel = stringResource(R.string.users_creating)
+            )
+        }
     }
 }
 
