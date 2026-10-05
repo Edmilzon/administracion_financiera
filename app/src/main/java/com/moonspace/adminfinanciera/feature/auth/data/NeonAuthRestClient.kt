@@ -14,6 +14,7 @@ import java.util.LinkedHashMap
 internal data class NeonAuthResponse(
     val userId: String?,
     val email: String?,
+    val name: String?,
     val sessionCookie: String?,
     val accessToken: String?,
     val emailVerificationRequired: Boolean = false
@@ -46,6 +47,22 @@ internal class NeonAuthRestClient(
 
     suspend fun getSession(cookieHeader: String): NeonAuthResponse =
         execute("get-session", method = "GET", cookieHeader = cookieHeader)
+
+    suspend fun updateProfileName(name: String, cookieHeader: String): NeonAuthResponse =
+        post("update-user", JSONObject().put("name", name), cookieHeader)
+
+    suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String,
+        cookieHeader: String
+    ): NeonAuthResponse = post(
+        "change-password",
+        JSONObject()
+            .put("currentPassword", currentPassword)
+            .put("newPassword", newPassword)
+            .put("revokeOtherSessions", false),
+        cookieHeader
+    )
 
     suspend fun signOut(cookieHeader: String) {
         execute("sign-out", method = "POST", payload = JSONObject(), cookieHeader = cookieHeader)
@@ -85,10 +102,13 @@ internal class NeonAuthRestClient(
             }
 
             val user = json?.optJSONObject("user")
+                ?: json?.optJSONObject("data")?.optJSONObject("user")
+                ?: json?.takeIf { it.has("id") }
             val mergedCookie = mergeCookies(cookieHeader, response.headers.values("Set-Cookie"))
             NeonAuthResponse(
                 userId = user?.optString("id")?.takeIf(String::isNotBlank),
                 email = user?.optString("email")?.takeIf(String::isNotBlank),
+                name = user?.optString("name")?.takeIf(String::isNotBlank),
                 sessionCookie = mergedCookie,
                 accessToken = response.header("set-auth-jwt")?.takeIf(String::isNotBlank)
                     ?: json?.optJSONObject("session")?.optString("token")?.takeIf(String::isNotBlank)

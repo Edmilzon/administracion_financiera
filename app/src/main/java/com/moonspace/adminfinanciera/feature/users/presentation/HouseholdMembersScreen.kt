@@ -38,6 +38,7 @@ import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinancePasswordField
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
+import com.moonspace.adminfinanciera.feature.auth.domain.AuthAccountMutation
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdMember
 import com.moonspace.adminfinanciera.feature.users.domain.HouseholdRole
@@ -47,7 +48,16 @@ fun HouseholdMembersScreen(
     user: AuthUser,
     state: HouseholdMembersUiState,
     isSigningOut: Boolean,
+    isAccountUpdateInProgress: Boolean,
+    accountUpdateErrorMessage: String?,
+    accountUpdateNoticeMessage: String?,
+    accountUpdateVersion: Int,
+    pendingAccountMutation: AuthAccountMutation?,
+    lastAccountMutation: AuthAccountMutation?,
     onSignOut: () -> Unit,
+    onUpdateProfileName: (String) -> Unit,
+    onChangePassword: (String, String) -> Unit,
+    onClearAccountUpdateMessages: () -> Unit,
     onRefresh: () -> Unit,
     onCreateHousehold: (String) -> Unit,
     onCreateMember: (String, String, HouseholdRole) -> Unit,
@@ -55,6 +65,7 @@ fun HouseholdMembersScreen(
     onRemoveMember: (String) -> Unit
 ) {
     var isAddMemberOpen by remember { mutableStateOf(false) }
+    var isAccountEditorOpen by rememberSaveable { mutableStateOf(false) }
     var selectedMemberForRole by remember { mutableStateOf<HouseholdMember?>(null) }
     var selectedMemberForRemoval by remember { mutableStateOf<HouseholdMember?>(null) }
     val snapshot = state.snapshot
@@ -79,7 +90,7 @@ fun HouseholdMembersScreen(
                 label = stringResource(R.string.users_sign_out),
                 onClick = onSignOut,
                 variant = FinanceButtonVariant.Secondary,
-                enabled = !state.isSubmitting && !isSigningOut,
+                enabled = !state.isSubmitting && !isSigningOut && !isAccountUpdateInProgress,
                 isLoading = isSigningOut,
                 loadingLabel = stringResource(R.string.users_signing_out)
             )
@@ -97,6 +108,14 @@ fun HouseholdMembersScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
+        AccountProfileCard(
+            user = user,
+            onEdit = {
+                onClearAccountUpdateMessages()
+                isAccountEditorOpen = true
+            }
+        )
 
         state.noticeMessage?.let { message ->
             FinanceStatusBanner(message = message, tone = FinanceStatusTone.Success)
@@ -166,6 +185,21 @@ fun HouseholdMembersScreen(
         )
     }
 
+    if (isAccountEditorOpen) {
+        AccountProfileSheet(
+            user = user,
+            isUpdating = isAccountUpdateInProgress,
+            pendingMutation = pendingAccountMutation,
+            updateErrorMessage = accountUpdateErrorMessage,
+            updateNoticeMessage = accountUpdateNoticeMessage,
+            updateVersion = accountUpdateVersion,
+            lastMutation = lastAccountMutation,
+            onDismiss = { if (!isAccountUpdateInProgress) isAccountEditorOpen = false },
+            onUpdateName = onUpdateProfileName,
+            onChangePassword = onChangePassword
+        )
+    }
+
     selectedMemberForRole?.let { member ->
         ChangeRoleSheet(
             member = member,
@@ -187,6 +221,165 @@ fun HouseholdMembersScreen(
             isDestructive = true,
             isProcessing = state.isSubmitting,
             processingLabel = stringResource(R.string.users_removing)
+        )
+    }
+}
+
+@Composable
+private fun AccountProfileCard(
+    user: AuthUser,
+    onEdit: () -> Unit
+) {
+    FinanceCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(FinanceSpacing.Medium),
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
+        ) {
+            Text(
+                text = stringResource(R.string.users_account_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = user.name.ifBlank { user.email.substringBefore('@') },
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = user.email,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FinanceButton(
+                label = stringResource(R.string.users_edit_account),
+                onClick = onEdit,
+                modifier = Modifier.fillMaxWidth(),
+                variant = FinanceButtonVariant.Secondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountProfileSheet(
+    user: AuthUser,
+    isUpdating: Boolean,
+    pendingMutation: AuthAccountMutation?,
+    updateErrorMessage: String?,
+    updateNoticeMessage: String?,
+    updateVersion: Int,
+    lastMutation: AuthAccountMutation?,
+    onDismiss: () -> Unit,
+    onUpdateName: (String) -> Unit,
+    onChangePassword: (String, String) -> Unit
+) {
+    var name by rememberSaveable(user.id) {
+        mutableStateOf(user.name.ifBlank { user.email.substringBefore('@') })
+    }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    val normalizedName = name.trim()
+    val passwordsMatch = newPassword == confirmation
+    val passwordIsValid = currentPassword.isNotBlank() &&
+        newPassword.length >= MIN_PASSWORD_LENGTH &&
+        passwordsMatch &&
+        newPassword != currentPassword
+
+    LaunchedEffect(user.name) {
+        name = user.name.ifBlank { user.email.substringBefore('@') }
+    }
+    LaunchedEffect(updateVersion, lastMutation) {
+        when (lastMutation) {
+            AuthAccountMutation.ProfileName -> name = user.name.ifBlank { user.email.substringBefore('@') }
+            AuthAccountMutation.Password -> {
+                currentPassword = ""
+                newPassword = ""
+                confirmation = ""
+            }
+            null -> Unit
+        }
+    }
+
+    FinanceBottomSheet(
+        title = stringResource(R.string.users_edit_account_title),
+        onDismissRequest = onDismiss
+    ) {
+        FinanceTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = stringResource(R.string.users_profile_name_label),
+            enabled = !isUpdating,
+            isError = normalizedName.isBlank(),
+            supportingText = if (normalizedName.isBlank()) {
+                stringResource(R.string.users_profile_name_required)
+            } else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        FinanceTextField(
+            value = user.email,
+            onValueChange = {},
+            label = stringResource(R.string.users_profile_email_label),
+            enabled = false,
+            readOnly = true,
+            supportingText = stringResource(R.string.users_profile_email_read_only)
+        )
+        FinanceButton(
+            label = stringResource(R.string.users_save_profile),
+            onClick = { onUpdateName(normalizedName) },
+            modifier = Modifier.fillMaxWidth(),
+            variant = FinanceButtonVariant.Secondary,
+            enabled = !isUpdating && normalizedName.isNotBlank() && normalizedName != user.name.trim(),
+            isLoading = isUpdating && pendingMutation == AuthAccountMutation.ProfileName,
+            loadingLabel = stringResource(R.string.users_saving_profile)
+        )
+
+        Spacer(Modifier.height(FinanceSpacing.Medium))
+        Text(
+            text = stringResource(R.string.users_change_password_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        FinancePasswordField(
+            value = currentPassword,
+            onValueChange = { currentPassword = it },
+            label = stringResource(R.string.users_current_password_label),
+            enabled = !isUpdating,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        FinancePasswordField(
+            value = newPassword,
+            onValueChange = { newPassword = it },
+            label = stringResource(R.string.users_new_password_label),
+            enabled = !isUpdating,
+            isError = newPassword.isNotEmpty() && newPassword.length < MIN_PASSWORD_LENGTH,
+            supportingText = if (newPassword.isNotEmpty() && newPassword.length < MIN_PASSWORD_LENGTH) {
+                stringResource(R.string.auth_password_rule)
+            } else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+        )
+        FinancePasswordField(
+            value = confirmation,
+            onValueChange = { confirmation = it },
+            label = stringResource(R.string.auth_confirm_password_label),
+            enabled = !isUpdating,
+            isError = confirmation.isNotEmpty() && !passwordsMatch,
+            supportingText = if (confirmation.isNotEmpty() && !passwordsMatch) {
+                stringResource(R.string.auth_password_mismatch)
+            } else if (newPassword.isNotEmpty() && newPassword == currentPassword) {
+                stringResource(R.string.users_new_password_must_differ)
+            } else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
+        )
+        updateNoticeMessage?.let { FinanceStatusBanner(it, tone = FinanceStatusTone.Success) }
+        updateErrorMessage?.let { FinanceStatusBanner(it, tone = FinanceStatusTone.Error) }
+        FinanceButton(
+            label = stringResource(R.string.users_save_password),
+            onClick = { onChangePassword(currentPassword, newPassword) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isUpdating && passwordIsValid,
+            isLoading = isUpdating && pendingMutation == AuthAccountMutation.Password,
+            loadingLabel = stringResource(R.string.users_changing_password)
         )
     }
 }

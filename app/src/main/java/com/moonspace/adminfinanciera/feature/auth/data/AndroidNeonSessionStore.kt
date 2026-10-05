@@ -15,6 +15,7 @@ import javax.crypto.spec.GCMParameterSpec
 internal data class NeonStoredSession(
     val userId: String,
     val email: String,
+    val name: String,
     val cookieHeader: String
 )
 
@@ -40,6 +41,8 @@ internal class AndroidNeonSessionStore(context: Context) {
             NeonStoredSession(
                 userId = json.getString("userId"),
                 email = json.getString("email"),
+                name = json.optString("name").takeIf(String::isNotBlank)
+                    ?: json.getString("email").substringBefore('@'),
                 cookieHeader = json.getString("cookieHeader")
             )
         } catch (_: Exception) {
@@ -53,6 +56,7 @@ internal class AndroidNeonSessionStore(context: Context) {
         val payload = JSONObject()
             .put("userId", session.userId)
             .put("email", session.email)
+            .put("name", session.name)
             .put("cookieHeader", session.cookieHeader)
             .toString()
             .toByteArray(Charsets.UTF_8)

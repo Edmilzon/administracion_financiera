@@ -5,6 +5,7 @@ import android.util.Base64
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.core.network.NeonAccessTokenProvider
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
+import com.moonspace.adminfinanciera.feature.auth.domain.AuthAccountUpdateResult
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthBootstrap
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
@@ -47,7 +48,7 @@ internal class NeonAuthRepository(
 
         try {
             val response = authClient.getSession(storedSession.cookieHeader)
-            val refreshed = response.toStoredSession(storedSession)
+            val refreshed = response.toStoredSession(storedSession, requireIdentity = true)
             if (refreshed == null) {
                 clearSession()
                 AuthBootstrap(user = null, isAuthConfigured = true, noticeMessage = dataApiNotice())
@@ -125,6 +126,74 @@ internal class NeonAuthRepository(
             authClient.signIn(normalizeEmail(email), password)
         }
 
+    override suspend fun updateProfileName(name: String): AuthAccountUpdateResult = withContext(Dispatchers.IO) {
+        val current = store.read()
+            ?: return@withContext AuthAccountUpdateResult.Failure(
+                appContext.getString(R.string.auth_session_unavailable)
+            )
+        if (!config.isAuthConfigured) {
+            return@withContext AuthAccountUpdateResult.Failure(
+                appContext.getString(R.string.auth_config_missing)
+            )
+        }
+        try {
+            val response = authClient.updateProfileName(name, current.cookieHeader)
+            if (response.userId != null && response.userId != current.userId) {
+                return@withContext AuthAccountUpdateResult.Failure(
+                    appContext.getString(R.string.auth_request_failed)
+                )
+            }
+            val updated = response.toStoredSession(current, requireIdentity = false)
+                ?.copy(name = response.name?.takeIf(String::isNotBlank) ?: name)
+                ?: current.copy(name = name)
+            store.save(updated)
+            cacheToken(response.accessToken ?: cachedAccessToken)
+            AuthAccountUpdateResult.Success(
+                user = updated.toAuthUser(),
+                message = appContext.getString(R.string.users_profile_saved)
+            )
+        } catch (error: NeonAuthHttpException) {
+            AuthAccountUpdateResult.Failure(errorMessage(error))
+        } catch (_: IOException) {
+            AuthAccountUpdateResult.Failure(appContext.getString(R.string.auth_connection_unavailable))
+        } catch (_: Exception) {
+            AuthAccountUpdateResult.Failure(appContext.getString(R.string.auth_request_failed))
+        }
+    }
+
+    override suspend fun changePassword(
+        currentPassword: String,
+        newPassword: String
+    ): AuthAccountUpdateResult = withContext(Dispatchers.IO) {
+        val current = store.read()
+            ?: return@withContext AuthAccountUpdateResult.Failure(
+                appContext.getString(R.string.auth_session_unavailable)
+            )
+        if (!config.isAuthConfigured) {
+            return@withContext AuthAccountUpdateResult.Failure(
+                appContext.getString(R.string.auth_config_missing)
+            )
+        }
+        try {
+            val response = authClient.changePassword(currentPassword, newPassword, current.cookieHeader)
+            if (response.userId != null && response.userId != current.userId) {
+                return@withContext AuthAccountUpdateResult.Failure(
+                    appContext.getString(R.string.auth_request_failed)
+                )
+            }
+            val refreshed = response.toStoredSession(current, requireIdentity = false) ?: current
+            store.save(refreshed)
+            cacheToken(response.accessToken ?: cachedAccessToken)
+            AuthAccountUpdateResult.Success(message = appContext.getString(R.string.users_password_changed))
+        } catch (error: NeonAuthHttpException) {
+            AuthAccountUpdateResult.Failure(passwordErrorMessage(error))
+        } catch (_: IOException) {
+            AuthAccountUpdateResult.Failure(appContext.getString(R.string.auth_connection_unavailable))
+        } catch (_: Exception) {
+            AuthAccountUpdateResult.Failure(appContext.getString(R.string.auth_request_failed))
+        }
+    }
+
     private suspend fun authenticate(
         isCreatingAccount: Boolean,
         request: suspend () -> NeonAuthResponse
@@ -152,6 +221,8 @@ internal class NeonAuthRepository(
                 val session = NeonStoredSession(
                     userId = userId,
                     email = responseEmail,
+                    name = response.name?.takeIf(String::isNotBlank)
+                        ?: responseEmail.substringBefore('@'),
                     cookieHeader = cookie
                 )
                 store.save(session)
@@ -190,7 +261,7 @@ internal class NeonAuthRepository(
         if (!config.isAuthConfigured) return@withLock null
         try {
             val response = authClient.getSession(storedSession.cookieHeader)
-            val refreshed = response.toStoredSession(storedSession) ?: run {
+            val refreshed = response.toStoredSession(storedSession, requireIdentity = true) ?: run {
                 clearSession()
                 return@withLock null
             }
@@ -205,15 +276,25 @@ internal class NeonAuthRepository(
         }
     }
 
-    private fun NeonAuthResponse.toStoredSession(previous: NeonStoredSession): NeonStoredSession? {
-        val userId = userId ?: return null
-        val email = email ?: return null
+    private fun NeonAuthResponse.toStoredSession(
+        previous: NeonStoredSession,
+        requireIdentity: Boolean
+    ): NeonStoredSession? {
+        if (requireIdentity && (userId == null || email == null)) return null
+        val resolvedUserId = userId ?: previous.userId
+        val resolvedEmail = email ?: previous.email
+        val resolvedName = name?.takeIf(String::isNotBlank) ?: previous.name
         val cookie = sessionCookie ?: previous.cookieHeader
         if (cookie.isBlank()) return null
-        return NeonStoredSession(userId = userId, email = email, cookieHeader = cookie)
+        return NeonStoredSession(
+            userId = resolvedUserId,
+            email = resolvedEmail,
+            name = resolvedName,
+            cookieHeader = cookie
+        )
     }
 
-    private fun NeonStoredSession.toAuthUser() = AuthUser(id = userId, email = email)
+    private fun NeonStoredSession.toAuthUser() = AuthUser(id = userId, email = email, name = name)
 
     private fun cacheToken(token: String?) {
         cachedAccessToken = token
@@ -240,6 +321,13 @@ internal class NeonAuthRepository(
         else -> appContext.getString(R.string.auth_request_failed)
     }
 
+    private fun passwordErrorMessage(error: NeonAuthHttpException): String = when {
+        error.statusCode == 401 || error.statusCode == 403 ||
+            error.errorCode?.contains("password", ignoreCase = true) == true ->
+            appContext.getString(R.string.users_current_password_invalid)
+        else -> appContext.getString(R.string.auth_request_failed)
+    }
+
     private fun NeonAuthResponse.toManagedAccount(isNewAccount: Boolean): MemberAccountProvisionResult {
         val userId = userId
         val email = email
@@ -250,7 +338,11 @@ internal class NeonAuthRepository(
         }
         // Deliberately do not call store.save() or cacheToken(): the current admin session stays active.
         return MemberAccountProvisionResult.Ready(
-            user = AuthUser(id = userId, email = email),
+            user = AuthUser(
+                id = userId,
+                email = email,
+                name = name?.takeIf(String::isNotBlank) ?: email.substringBefore('@')
+            ),
             isNewAccount = isNewAccount,
             emailVerificationRequired = emailVerificationRequired
         )

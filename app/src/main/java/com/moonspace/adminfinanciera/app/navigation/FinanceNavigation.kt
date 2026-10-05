@@ -213,6 +213,12 @@ fun FinanceNavigation() {
                         user = user,
                         state = membersState,
                         isSigningOut = uiState.isSubmitting,
+                        isAccountUpdateInProgress = uiState.isUpdatingAccount,
+                        accountUpdateErrorMessage = uiState.accountUpdateErrorMessage,
+                        accountUpdateNoticeMessage = uiState.accountUpdateNoticeMessage,
+                        accountUpdateVersion = uiState.accountUpdateVersion,
+                        pendingAccountMutation = uiState.pendingAccountMutation,
+                        lastAccountMutation = uiState.lastAccountMutation,
                         onSignOut = {
                             membersViewModel.clearAccountContext()
                             transactionsViewModel.clearAccountContext()
@@ -224,6 +230,9 @@ fun FinanceNavigation() {
                             container.closeFinancialDatabases()
                             authViewModel.signOut()
                         },
+                        onUpdateProfileName = authViewModel::updateProfileName,
+                        onChangePassword = authViewModel::changePassword,
+                        onClearAccountUpdateMessages = authViewModel::clearAccountUpdateMessages,
                         onRefresh = { membersViewModel.load(user, forceRefresh = true) },
                         onCreateHousehold = { membersViewModel.createHousehold(user, it) },
                         onCreateMember = { email, password, role ->
