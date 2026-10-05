@@ -18,9 +18,6 @@ data class FinanceMemberTotal(
 )
 
 data class FinanceTransactionReport(
-    val incomeCentavos: BigInteger,
-    val expenseCentavos: BigInteger,
-    val balanceCentavos: BigInteger,
     val categoryTotals: List<FinanceCategoryTotal>,
     val memberTotals: List<FinanceMemberTotal>
 )
@@ -29,8 +26,6 @@ fun buildFinanceTransactionReport(
     transactions: List<FinanceTransaction>,
     memberEmails: Map<String, String>
 ): FinanceTransactionReport {
-    val income = transactions.filter { it.kind == TransactionKind.Income }.sumCentavos()
-    val expense = transactions.filter { it.kind == TransactionKind.Expense }.sumCentavos()
     val categories = transactions
         .groupBy { it.categoryId to it.kind }
         .map { (key, records) ->
@@ -65,9 +60,6 @@ fun buildFinanceTransactionReport(
         )
 
     return FinanceTransactionReport(
-        incomeCentavos = income,
-        expenseCentavos = expense,
-        balanceCentavos = income - expense,
         categoryTotals = categories,
         memberTotals = members
     )

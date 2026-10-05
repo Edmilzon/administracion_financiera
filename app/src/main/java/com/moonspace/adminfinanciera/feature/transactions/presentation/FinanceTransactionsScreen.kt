@@ -113,18 +113,11 @@ fun FinanceTransactionsScreen(
             .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Medium),
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
-            Text(
-                text = stringResource(R.string.transactions_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.transactions_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = stringResource(R.string.transactions_title),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
 
         when {
             state.isLoading -> FinanceLoadingState(stringResource(R.string.transactions_loading))
@@ -158,7 +151,7 @@ fun FinanceTransactionsScreen(
                             transactionToEdit = null
                             isShowingEditor = true
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(2f)
                     )
                     if (state.canManageCategories) {
                         FinanceButton(
@@ -167,7 +160,8 @@ fun FinanceTransactionsScreen(
                                 onClearMessages()
                                 isShowingCategoryManager = true
                             },
-                            variant = FinanceButtonVariant.Secondary
+                            variant = FinanceButtonVariant.Secondary,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -177,9 +171,6 @@ fun FinanceTransactionsScreen(
                     verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
                     contentPadding = PaddingValues(bottom = FinanceSpacing.Large)
                 ) {
-                    item(key = "transaction_summary") {
-                        TransactionSummaryCard(report)
-                    }
                     if (report.categoryTotals.isNotEmpty()) {
                         item(key = "category_breakdown_header") {
                             FinanceSectionHeader(stringResource(R.string.transactions_category_breakdown))
@@ -302,39 +293,6 @@ fun FinanceTransactionsScreen(
             isProcessing = state.isSubmitting,
             processingLabel = stringResource(R.string.transactions_deleting)
         )
-    }
-}
-
-@Composable
-private fun TransactionSummaryCard(report: FinanceTransactionReport) {
-    val periodLabel = stringResource(R.string.transactions_period_all)
-    FinanceCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(FinanceSpacing.Medium),
-            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
-        ) {
-            FinanceSectionHeader(
-                title = stringResource(R.string.transactions_summary_title),
-                supportingText = stringResource(R.string.transactions_summary_period, periodLabel)
-            )
-            SummaryAmountRow(
-                label = stringResource(R.string.transactions_summary_income),
-                amountCentavos = report.incomeCentavos,
-                kind = FinanceAmountKind.Income
-            )
-            SummaryAmountRow(
-                label = stringResource(R.string.transactions_summary_expenses),
-                amountCentavos = report.expenseCentavos,
-                kind = FinanceAmountKind.Expense
-            )
-            SummaryAmountRow(
-                label = stringResource(R.string.transactions_summary_balance),
-                amountCentavos = report.balanceCentavos,
-                kind = FinanceAmountKind.Neutral
-            )
-        }
     }
 }
 

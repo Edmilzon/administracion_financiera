@@ -79,10 +79,6 @@
     <string name="users_http_error">Neon respondió con HTTP %1$d. Revisa que las migraciones y la Data API estén configuradas.</string>
     <string name="users_invalid_response">Neon devolvió una respuesta que la app no pudo interpretar.</string>
     <string name="transactions_title">Movimientos</string>
-    <string name="transactions_description">Registra y consulta los ingresos y gastos de este espacio.</string>
-    <string name="transactions_summary_title">Resumen</string>
-    <string name="transactions_summary_period">Período: %1$s</string>
-    <string name="transactions_period_all">Todos los movimientos</string>
     <string name="transactions_summary_income">Ingresos</string>
     <string name="transactions_summary_expenses">Gastos</string>
     <string name="transactions_summary_balance">Diferencia</string>
