@@ -37,7 +37,8 @@ fun DashboardScreen(
     onSignOut: () -> Unit,
     onOpenUsers: () -> Unit,
     onOpenTransactions: () -> Unit,
-    onOpenBudgets: () -> Unit
+    onOpenBudgets: () -> Unit,
+    onOpenRecurring: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -127,7 +128,8 @@ fun DashboardScreen(
             MenuTile(
                 number = "03",
                 title = stringResource(R.string.menu_recurring),
-                description = stringResource(R.string.menu_recurring_description)
+                description = stringResource(R.string.menu_recurring_description),
+                onClick = onOpenRecurring
             )
             MenuTile(
                 number = "04",

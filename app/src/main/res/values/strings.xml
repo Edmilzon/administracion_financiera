@@ -40,7 +40,7 @@
     <string name="menu_budgets">Presupuestos</string>
     <string name="menu_budgets_description">Límites mensuales para ingresos y gastos</string>
     <string name="menu_recurring">Recurrentes</string>
-    <string name="menu_recurring_description">Movimientos por confirmar</string>
+    <string name="menu_recurring_description">Programa y confirma tus movimientos periódicos</string>
     <string name="menu_reports">Reportes</string>
     <string name="menu_reports_description">Exportar PDF o Excel</string>
     <string name="menu_users">Usuarios</string>
@@ -209,6 +209,57 @@
     <string name="budgets_permission_denied">Solo puedes crear, editar o eliminar tus propios presupuestos.</string>
     <string name="budgets_record_unavailable">Ese presupuesto ya no está disponible o no tienes permiso para modificarlo.</string>
     <string name="budgets_operation_failed">No se pudo guardar el cambio. Inténtalo de nuevo.</string>
+    <string name="recurring_back">Volver al menú</string>
+    <string name="recurring_title">Recurrentes</string>
+    <string name="recurring_description">Programa ingresos y gastos periódicos. Cada vencimiento necesita tu confirmación antes de registrarse.</string>
+    <string name="recurring_loading">Cargando reglas recurrentes…</string>
+    <string name="recurring_load_failed">No se pudieron cargar las reglas recurrentes.</string>
+    <string name="recurring_retry">Intentar de nuevo</string>
+    <string name="recurring_reminder_schedule">Los avisos agrupados se programan cada día a las 09:00. Permite las notificaciones de la app para recibirlos.</string>
+    <string name="recurring_add_rule">Nueva regla</string>
+    <string name="recurring_list_title">Reglas del espacio</string>
+    <string name="recurring_visible_count">%1$d reglas visibles</string>
+    <string name="recurring_empty_title">Aún no hay reglas recurrentes</string>
+    <string name="recurring_empty_description">Crea una regla para programar un ingreso o gasto que se repite.</string>
+    <string name="recurring_editor_add_title">Nueva regla recurrente</string>
+    <string name="recurring_editor_edit_title">Editar regla recurrente</string>
+    <string name="recurring_saved_locally">Regla guardada en este teléfono.</string>
+    <string name="recurring_frequency_label">Frecuencia</string>
+    <string name="recurring_frequency_daily">Diaria</string>
+    <string name="recurring_frequency_weekly">Semanal</string>
+    <string name="recurring_frequency_monthly">Mensual</string>
+    <string name="recurring_every_day">Cada día</string>
+    <string name="recurring_every_week">Cada semana</string>
+    <string name="recurring_every_month">Cada mes</string>
+    <string name="recurring_interval_days">Cada cuántos días</string>
+    <string name="recurring_interval_weeks">Cada cuántas semanas</string>
+    <string name="recurring_interval_months">Cada cuántos meses</string>
+    <string name="recurring_start_date">Fecha inicial · %1$s</string>
+    <string name="recurring_start_date_title">Elige la fecha inicial</string>
+    <string name="recurring_invalid_amount">Ingresa un monto mayor que cero con hasta dos decimales.</string>
+    <string name="recurring_invalid_interval">Ingresa un intervalo entero entre 1 y 3650.</string>
+    <string name="recurring_invalid_date">Elige una fecha inicial válida.</string>
+    <string name="recurring_category_unavailable">Elige una categoría activa del mismo tipo que el movimiento.</string>
+    <string name="recurring_rule_unavailable">La regla ya no está disponible o no tienes permiso para modificarla.</string>
+    <string name="recurring_occurrence_not_due">Esta ocurrencia todavía no venció.</string>
+    <string name="recurring_permission_denied">Solo puedes gestionar tus propias reglas recurrentes.</string>
+    <string name="recurring_operation_failed">No se pudo guardar el cambio. Inténtalo de nuevo.</string>
+    <string name="recurring_owner_read_only">De %1$s · Solo consulta</string>
+    <string name="recurring_paused">Pausada</string>
+    <string name="recurring_due">Vencida · requiere confirmación</string>
+    <string name="recurring_next_due">Siguiente · %1$s</string>
+    <string name="recurring_register_occurrence">Revisar y registrar</string>
+    <string name="recurring_edit">Editar</string>
+    <string name="recurring_pause">Pausar</string>
+    <string name="recurring_activate">Activar</string>
+    <string name="recurring_confirm_title">Registrar movimiento</string>
+    <string name="recurring_confirm_message">Se registrará %1$s de %2$s por %3$s con fecha %4$s. Esta ocurrencia solo se registrará una vez.</string>
+    <string name="recurring_confirm_register">Confirmar y registrar</string>
+    <string name="recurring_registering">Registrando…</string>
+    <string name="recurring_save_rule">Guardar regla</string>
+    <string name="recurring_saving_rule">Guardando…</string>
+    <string name="recurring_notification_channel">Avisos de movimientos recurrentes</string>
+    <string name="recurring_notification_title">Movimientos por confirmar</string>
     <string name="categories_title">Administrar categorías</string>
     <string name="categories_new">Nueva categoría</string>
     <string name="categories_edit_title">Editar categoría</string>
@@ -232,6 +283,7 @@
     <string name="nav_home">Inicio</string>
     <string name="nav_transactions">Movimientos</string>
     <string name="nav_budgets">Presupuestos</string>
+    <string name="nav_recurring">Recurrentes</string>
     <string name="nav_users">Usuarios</string>
     <string name="ui_close">Cerrar</string>
     <plurals name="transactions_results_count">
@@ -241,5 +293,25 @@
     <plurals name="budgets_pending_sync_count">
         <item quantity="one">%1$d cambio espera sincronización automática.</item>
         <item quantity="other">%1$d cambios esperan sincronización automática.</item>
+    </plurals>
+    <plurals name="recurring_pending_sync_count">
+        <item quantity="one">%1$d cambio recurrente espera sincronización automática.</item>
+        <item quantity="other">%1$d cambios recurrentes esperan sincronización automática.</item>
+    </plurals>
+    <plurals name="recurring_notification_count">
+        <item quantity="one">Tienes %1$d movimiento vencido por confirmar.</item>
+        <item quantity="other">Tienes %1$d movimientos vencidos por confirmar.</item>
+    </plurals>
+    <plurals name="recurring_interval_days_count">
+        <item quantity="one">Cada %1$d día</item>
+        <item quantity="other">Cada %1$d días</item>
+    </plurals>
+    <plurals name="recurring_interval_weeks_count">
+        <item quantity="one">Cada %1$d semana</item>
+        <item quantity="other">Cada %1$d semanas</item>
+    </plurals>
+    <plurals name="recurring_interval_months_count">
+        <item quantity="one">Cada %1$d mes</item>
+        <item quantity="other">Cada %1$d meses</item>
     </plurals>
 </resources>

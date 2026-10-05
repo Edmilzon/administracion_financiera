@@ -88,7 +88,8 @@ data class CategoryEntity(
     indices = [
         Index(value = ["household_id", "occurred_on"]),
         Index(value = ["household_id", "created_by", "occurred_on"]),
-        Index(value = ["household_id", "category_id"])
+        Index(value = ["household_id", "category_id"]),
+        Index(value = ["source_recurring_rule_id", "scheduled_for"], unique = true)
     ],
     foreignKeys = [
         ForeignKey(
@@ -110,6 +111,51 @@ data class TransactionEntity(
     val currency: String,
     @androidx.room.ColumnInfo(name = "occurred_on") val occurredOn: String,
     val description: String?,
+    @androidx.room.ColumnInfo(name = "created_at") val createdAt: Long,
+    @androidx.room.ColumnInfo(name = "updated_at") val updatedAt: Long,
+    @androidx.room.ColumnInfo(name = "is_remote_backed", defaultValue = "0")
+    val isRemoteBacked: Boolean = false,
+    @androidx.room.ColumnInfo(name = "source_recurring_rule_id") val sourceRecurringRuleId: String? = null,
+    @androidx.room.ColumnInfo(name = "scheduled_for") val scheduledFor: String? = null
+)
+
+@Entity(
+    tableName = "recurring_rules",
+    indices = [
+        Index("account_id"),
+        Index(value = ["household_id", "next_due_on", "is_active"]),
+        Index(value = ["household_id", "created_by", "next_due_on"])
+    ],
+    foreignKeys = [
+        ForeignKey(
+            entity = HouseholdCacheEntity::class,
+            parentColumns = ["account_id"],
+            childColumns = ["account_id"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = CategoryEntity::class,
+            parentColumns = ["household_id", "id"],
+            childColumns = ["household_id", "category_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ]
+)
+data class RecurringRuleEntity(
+    @PrimaryKey val id: String,
+    @androidx.room.ColumnInfo(name = "account_id") val accountId: String,
+    @androidx.room.ColumnInfo(name = "household_id") val householdId: String,
+    @androidx.room.ColumnInfo(name = "created_by") val createdBy: String,
+    @androidx.room.ColumnInfo(name = "category_id") val categoryId: String,
+    val kind: String,
+    @androidx.room.ColumnInfo(name = "amount_centavos") val amountCentavos: Long,
+    val currency: String,
+    val description: String?,
+    val frequency: String,
+    @androidx.room.ColumnInfo(name = "interval_count") val intervalCount: Int,
+    @androidx.room.ColumnInfo(name = "start_on") val startOn: String,
+    @androidx.room.ColumnInfo(name = "next_due_on") val nextDueOn: String,
+    @androidx.room.ColumnInfo(name = "is_active") val isActive: Boolean,
     @androidx.room.ColumnInfo(name = "created_at") val createdAt: Long,
     @androidx.room.ColumnInfo(name = "updated_at") val updatedAt: Long,
     @androidx.room.ColumnInfo(name = "is_remote_backed", defaultValue = "0")
@@ -307,6 +353,12 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(entity: TransactionEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfMissing(entity: TransactionEntity): Long
+
+    @Query("SELECT * FROM transactions WHERE source_recurring_rule_id = :ruleId AND scheduled_for = :scheduledFor LIMIT 1")
+    suspend fun findRecurringOccurrence(ruleId: String, scheduledFor: String): TransactionEntity?
+
     @Query("DELETE FROM transactions WHERE id = :transactionId AND household_id = :householdId")
     suspend fun delete(householdId: String, transactionId: String)
 
@@ -318,6 +370,42 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET is_remote_backed = 1 WHERE id = :transactionId AND household_id = :householdId")
     suspend fun markRemoteBacked(householdId: String, transactionId: String)
+}
+
+@Dao
+interface RecurringRuleDao {
+    @Query("SELECT * FROM recurring_rules WHERE household_id = :householdId ORDER BY is_active DESC, next_due_on, created_by")
+    fun observeAllForHousehold(householdId: String): Flow<List<RecurringRuleEntity>>
+
+    @Query("SELECT * FROM recurring_rules WHERE household_id = :householdId AND created_by = :userId ORDER BY is_active DESC, next_due_on")
+    fun observeOwn(householdId: String, userId: String): Flow<List<RecurringRuleEntity>>
+
+    @Query("SELECT * FROM recurring_rules WHERE household_id = :householdId AND id = :ruleId LIMIT 1")
+    suspend fun findById(householdId: String, ruleId: String): RecurringRuleEntity?
+
+    @Query("SELECT * FROM recurring_rules WHERE account_id = :accountId AND household_id = :householdId AND is_active = 1 AND next_due_on <= :today ORDER BY next_due_on, id")
+    suspend fun dueForAccount(accountId: String, householdId: String, today: String): List<RecurringRuleEntity>
+
+    @Query("SELECT * FROM recurring_rules WHERE household_id = :householdId")
+    suspend fun allForHousehold(householdId: String): List<RecurringRuleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfMissing(entity: RecurringRuleEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(entity: RecurringRuleEntity)
+
+    @Query("DELETE FROM recurring_rules WHERE household_id = :householdId AND id = :ruleId")
+    suspend fun deleteById(householdId: String, ruleId: String)
+
+    @Query("DELETE FROM recurring_rules WHERE household_id = :householdId")
+    suspend fun deleteForHousehold(householdId: String)
+
+    @Query("DELETE FROM recurring_rules WHERE household_id = :householdId AND created_by != :userId")
+    suspend fun removeOthers(householdId: String, userId: String)
+
+    @Query("UPDATE recurring_rules SET is_remote_backed = 1 WHERE household_id = :householdId AND id = :ruleId")
+    suspend fun markRemoteBacked(householdId: String, ruleId: String)
 }
 
 @Dao
@@ -409,12 +497,13 @@ interface BudgetDao {
         HouseholdMemberCacheEntity::class,
         CategoryEntity::class,
         TransactionEntity::class,
+        RecurringRuleEntity::class,
         BudgetEntity::class,
         SyncOutboxEntity::class,
         TransactionDeletionMarkerEntity::class,
         SyncStateEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -422,6 +511,7 @@ abstract class FinanceDatabase : RoomDatabase() {
     abstract fun householdCacheDao(): HouseholdCacheDao
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
+    abstract fun recurringRuleDao(): RecurringRuleDao
     abstract fun budgetDao(): BudgetDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun transactionDeletionMarkerDao(): TransactionDeletionMarkerDao
@@ -474,6 +564,40 @@ abstract class FinanceDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS `index_budgets_account_id_household_id_user_id_month_start_category_key` " +
                         "ON `budgets` (`account_id`, `household_id`, `user_id`, `month_start`, `category_key`)"
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `source_recurring_rule_id` TEXT")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `scheduled_for` TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_source_recurring_rule_id_scheduled_for` " +
+                        "ON `transactions` (`source_recurring_rule_id`, `scheduled_for`)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `recurring_rules` (" +
+                        "`id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `household_id` TEXT NOT NULL, " +
+                        "`created_by` TEXT NOT NULL, `category_id` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                        "`amount_centavos` INTEGER NOT NULL, `currency` TEXT NOT NULL, `description` TEXT, " +
+                        "`frequency` TEXT NOT NULL, `interval_count` INTEGER NOT NULL, `start_on` TEXT NOT NULL, " +
+                        "`next_due_on` TEXT NOT NULL, `is_active` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `is_remote_backed` INTEGER NOT NULL DEFAULT 0, " +
+                        "PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`account_id`) REFERENCES `household_cache`(`account_id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                        "FOREIGN KEY(`household_id`, `category_id`) REFERENCES `categories`(`household_id`, `id`) " +
+                        "ON UPDATE NO ACTION ON DELETE RESTRICT)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_rules_account_id` ON `recurring_rules` (`account_id`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_recurring_rules_household_id_next_due_on_is_active` " +
+                        "ON `recurring_rules` (`household_id`, `next_due_on`, `is_active`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_recurring_rules_household_id_created_by_next_due_on` " +
+                        "ON `recurring_rules` (`household_id`, `created_by`, `next_due_on`)"
                 )
             }
         }

@@ -80,6 +80,7 @@ class RoomFinancialRepository(
                 )
                 if (cached?.householdId != null && cached.householdId != householdId) {
                     database.transactionDao().deleteForHousehold(cached.householdId)
+                    database.recurringRuleDao().deleteForHousehold(cached.householdId)
                     database.budgetDao().deleteForHousehold(cached.householdId)
                     database.categoryDao().deleteForHousehold(cached.householdId)
                     database.syncOutboxDao().clearAccount(accountId)
@@ -87,6 +88,7 @@ class RoomFinancialRepository(
                 }
                 if (role == ROLE_MEMBER) {
                     database.transactionDao().removeOthers(householdId, accountId)
+                    database.recurringRuleDao().removeOthers(householdId, accountId)
                     database.budgetDao().removeOthers(householdId, accountId)
                 }
             }
@@ -138,6 +140,10 @@ class RoomFinancialRepository(
 
             val now = System.currentTimeMillis()
             val id = previous?.id ?: UUID.randomUUID().toString()
+            val recurringRuleId = draft.sourceRecurringRuleId ?: previous?.sourceRecurringRuleId
+            val scheduledFor = draft.scheduledFor ?: previous?.scheduledFor?.let { previousScheduledDate ->
+                if (draft.occurredOn != previous.occurredOn) draft.occurredOn else previousScheduledDate
+            }
             database.transactionDao().save(
                 TransactionEntity(
                     id = id,
@@ -152,7 +158,9 @@ class RoomFinancialRepository(
                     description = draft.description?.trim()?.takeIf(String::isNotEmpty),
                     createdAt = previous?.createdAt ?: now,
                     updatedAt = now,
-                    isRemoteBacked = previous?.isRemoteBacked ?: false
+                    isRemoteBacked = previous?.isRemoteBacked ?: false,
+                    sourceRecurringRuleId = recurringRuleId,
+                    scheduledFor = scheduledFor
                 )
             )
             database.transactionDeletionMarkerDao().remove(id)
@@ -320,7 +328,9 @@ class RoomFinancialRepository(
             occurredOn = occurredOn,
             description = description,
             createdAt = createdAt,
-            updatedAt = updatedAt
+            updatedAt = updatedAt,
+            sourceRecurringRuleId = sourceRecurringRuleId,
+            scheduledFor = scheduledFor
         )
     }
 

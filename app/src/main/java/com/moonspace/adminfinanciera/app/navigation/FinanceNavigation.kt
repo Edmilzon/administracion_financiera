@@ -1,5 +1,11 @@
 package com.moonspace.adminfinanciera.app.navigation
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -24,6 +30,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.app.di.FinanceAppContainer
 import com.moonspace.adminfinanciera.core.ui.components.FinanceBottomNavigationBar
@@ -38,11 +47,18 @@ import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTr
 import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsViewModel
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersScreen
 import com.moonspace.adminfinanciera.feature.users.presentation.HouseholdMembersViewModel
+import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecurringScreen
+import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecurringViewModel
 
 @Composable
 fun FinanceNavigation() {
-    val context = LocalContext.current.applicationContext
+    val currentContext = LocalContext.current
+    val activity = remember(currentContext) { currentContext.findActivity() }
+    val context = currentContext.applicationContext
     val container = remember(context) { FinanceAppContainer(context) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
     val authViewModel: AuthViewModel = viewModel(
         factory = remember(container) { AuthViewModel.Factory(container.authRepository) }
     )
@@ -58,6 +74,7 @@ fun FinanceNavigation() {
         val user = requireNotNull(uiState.user)
         LaunchedEffect(user.id) {
             container.syncScheduler.scheduleForSignedInAccount(user.id)
+            container.recurringReminderScheduler.scheduleDaily(user.id)
         }
         val membersViewModel: HouseholdMembersViewModel = viewModel(
             factory = remember(container) {
@@ -86,13 +103,47 @@ fun FinanceNavigation() {
             }
         )
         val budgetsState by budgetsViewModel.uiState.collectAsStateWithLifecycle()
-        var destination by rememberSaveable(user.id) { mutableStateOf("dashboard") }
+        val recurringViewModel: FinanceRecurringViewModel = viewModel(
+            factory = remember(container) {
+                FinanceRecurringViewModel.Factory(
+                    context,
+                    container.householdMembersRepository,
+                    container.financialRepository,
+                    container.recurringRuleRepository
+                )
+            }
+        )
+        val recurringState by recurringViewModel.uiState.collectAsStateWithLifecycle()
+        var destination by rememberSaveable(user.id) {
+            mutableStateOf(
+                if (activity?.intent?.getBooleanExtra(com.moonspace.adminfinanciera.app.MainActivity.EXTRA_OPEN_RECURRING, false) == true) {
+                    DESTINATION_RECURRING
+                } else {
+                    DESTINATION_DASHBOARD
+                }
+            )
+        }
+        var askedForNotificationPermission by rememberSaveable(user.id) { mutableStateOf(false) }
 
         LaunchedEffect(user.id, destination) {
             when (destination) {
                 DESTINATION_USERS -> membersViewModel.load(user)
                 DESTINATION_TRANSACTIONS -> transactionsViewModel.load(user)
                 DESTINATION_BUDGETS -> budgetsViewModel.load(user)
+                DESTINATION_RECURRING -> {
+                    recurringViewModel.load(user)
+                    if (!askedForNotificationPermission) {
+                        askedForNotificationPermission = true
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                currentContext,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
             }
         }
 
@@ -105,6 +156,11 @@ fun FinanceNavigation() {
                     R.drawable.ic_nav_transactions
                 ),
                 FinanceNavigationDestination(DESTINATION_BUDGETS, R.string.nav_budgets, R.drawable.ic_nav_budgets),
+                FinanceNavigationDestination(
+                    DESTINATION_RECURRING,
+                    R.string.nav_recurring,
+                    R.drawable.ic_nav_recurring
+                ),
                 FinanceNavigationDestination(DESTINATION_USERS, R.string.nav_users, R.drawable.ic_nav_users)
             )
         }
@@ -169,6 +225,18 @@ fun FinanceNavigation() {
                         onMoveMonth = budgetsViewModel::moveMonthBy,
                         onClearMessages = budgetsViewModel::clearMessages
                     )
+                } else if (destination == DESTINATION_RECURRING) {
+                    FinanceRecurringScreen(
+                        user = user,
+                        state = recurringState,
+                        onBack = { destination = DESTINATION_DASHBOARD },
+                        onOpenUsers = { destination = DESTINATION_USERS },
+                        onRefresh = { recurringViewModel.load(user) },
+                        onSaveRule = recurringViewModel::saveRule,
+                        onSetRuleActive = recurringViewModel::setRuleActive,
+                        onConfirmOccurrence = recurringViewModel::confirmOccurrence,
+                        onClearMessages = recurringViewModel::clearMessages
+                    )
                 } else {
                     DashboardScreen(
                         user = user,
@@ -176,13 +244,16 @@ fun FinanceNavigation() {
                         onSignOut = {
                             transactionsViewModel.clearAccountContext()
                             budgetsViewModel.clearAccountContext()
+                            recurringViewModel.clearAccountContext()
                             container.syncScheduler.cancelAccount(user.id)
+                            container.recurringReminderScheduler.cancelAccount(user.id)
                             container.closeFinancialDatabases()
                             authViewModel.signOut()
                         },
                         onOpenUsers = { destination = DESTINATION_USERS },
                         onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
-                        onOpenBudgets = { destination = DESTINATION_BUDGETS }
+                        onOpenBudgets = { destination = DESTINATION_BUDGETS },
+                        onOpenRecurring = { destination = DESTINATION_RECURRING }
                     )
                 }
             }
@@ -203,6 +274,13 @@ private const val DESTINATION_DASHBOARD = "dashboard"
 private const val DESTINATION_USERS = "users"
 private const val DESTINATION_TRANSACTIONS = "transactions"
 private const val DESTINATION_BUDGETS = "budgets"
+private const val DESTINATION_RECURRING = "recurring"
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 @Composable
 private fun SessionLoadingScreen() {

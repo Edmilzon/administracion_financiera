@@ -32,7 +32,9 @@ data class FinanceTransaction(
     val occurredOn: String,
     val description: String?,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val sourceRecurringRuleId: String? = null,
+    val scheduledFor: String? = null
 )
 
 data class TransactionDraft(
@@ -41,7 +43,9 @@ data class TransactionDraft(
     val amountCentavos: Long,
     val categoryId: String,
     val occurredOn: String,
-    val description: String?
+    val description: String?,
+    val sourceRecurringRuleId: String? = null,
+    val scheduledFor: String? = null
 )
 
 data class CategoryDraft(

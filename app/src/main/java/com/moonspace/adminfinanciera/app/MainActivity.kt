@@ -22,4 +22,8 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    companion object {
+        const val EXTRA_OPEN_RECURRING = "open_recurring"
+    }
 }

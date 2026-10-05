@@ -6,6 +6,7 @@ import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvi
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
 import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
+import com.moonspace.adminfinanciera.core.sync.RecurringReminderScheduler
 import com.moonspace.adminfinanciera.feature.transactions.data.NeonFinanceSyncRepository
 import com.moonspace.adminfinanciera.feature.auth.data.NeonAuthRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
@@ -15,10 +16,13 @@ import com.moonspace.adminfinanciera.feature.transactions.data.RoomFinancialRepo
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinancialRepository
 import com.moonspace.adminfinanciera.feature.budgets.data.RoomBudgetRepository
 import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetRepository
+import com.moonspace.adminfinanciera.feature.recurring.data.RoomRecurringRuleRepository
+import com.moonspace.adminfinanciera.feature.recurring.domain.RecurringRuleRepository
 
 class FinanceAppContainer(context: Context) {
     val financeDatabases = EncryptedFinanceDatabaseProvider(context.applicationContext)
     val syncScheduler = FinanceSyncScheduler(context.applicationContext)
+    val recurringReminderScheduler = RecurringReminderScheduler(context.applicationContext)
     val neonApiConfig = NeonApiConfig(
         authBaseUrl = BuildConfig.NEON_AUTH_BASE_URL,
         dataApiBaseUrl = BuildConfig.NEON_DATA_API_URL
@@ -35,6 +39,11 @@ class FinanceAppContainer(context: Context) {
     )
     val financialRepository: FinancialRepository = RoomFinancialRepository(financeDatabases, syncScheduler)
     val budgetRepository: BudgetRepository = RoomBudgetRepository(financeDatabases, syncScheduler)
+    val recurringRuleRepository: RecurringRuleRepository = RoomRecurringRuleRepository(
+        financeDatabases,
+        syncScheduler,
+        recurringReminderScheduler
+    )
     val financeSyncRepository = NeonFinanceSyncRepository(
         config = neonApiConfig,
         dataApiClient = dataApiClient,

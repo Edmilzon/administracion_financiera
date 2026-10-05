@@ -5,6 +5,7 @@ import com.moonspace.adminfinanciera.core.database.BudgetEntity
 import com.moonspace.adminfinanciera.core.database.CategoryEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
 import com.moonspace.adminfinanciera.core.database.FinanceDatabase
+import com.moonspace.adminfinanciera.core.database.RecurringRuleEntity
 import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
 import com.moonspace.adminfinanciera.core.database.SyncStateEntity
 import com.moonspace.adminfinanciera.core.database.TransactionEntity
@@ -87,6 +88,14 @@ class NeonFinanceSyncRepository(
                 if (role == ROLE_MEMBER) put("user_id", "eq.$accountId")
             }
         ).map { it.toBudget(accountId) }
+        val remoteRecurringRules = requestRows(
+            resource = RECURRING_RULES_RESOURCE,
+            query = buildMap {
+                put("select", RECURRING_RULE_COLUMNS)
+                put("household_id", "eq.$householdId")
+                if (role == ROLE_MEMBER) put("created_by", "eq.$accountId")
+            }
+        ).map { it.toRecurringRule(accountId) }
         val remoteMarkers = requestRows(
             resource = DELETION_MARKERS_RESOURCE,
             query = mapOf(
@@ -112,6 +121,7 @@ class NeonFinanceSyncRepository(
             role = role,
             categories = remoteCategories,
             budgets = remoteBudgets,
+            recurringRules = remoteRecurringRules,
             transactions = remoteTransactions,
             deletedTransactionIds = remoteMarkers.mapNotNull { it.optString("transaction_id").takeIf(String::isNotBlank) }.toSet(),
             previousSuccessfulSyncAt = lastSyncAt,
@@ -123,7 +133,8 @@ class NeonFinanceSyncRepository(
             accountId = accountId,
             householdId = householdId,
             remoteCategoryIds = remoteCategories.mapTo(mutableSetOf(), CategoryEntity::id),
-            remoteBudgetIds = remoteBudgets.mapTo(mutableSetOf(), BudgetEntity::id)
+            remoteBudgetIds = remoteBudgets.mapTo(mutableSetOf(), BudgetEntity::id),
+            remoteRecurringRuleIds = remoteRecurringRules.mapTo(mutableSetOf(), RecurringRuleEntity::id)
         )
         database.syncStateDao().save(
             SyncStateEntity(
@@ -141,6 +152,7 @@ class NeonFinanceSyncRepository(
         role: String,
         categories: List<CategoryEntity>,
         budgets: List<BudgetEntity>,
+        recurringRules: List<RecurringRuleEntity>,
         transactions: List<TransactionEntity>,
         deletedTransactionIds: Set<String>,
         previousSuccessfulSyncAt: Long?,
@@ -149,11 +161,13 @@ class NeonFinanceSyncRepository(
     ) {
         val categoryDao = database.categoryDao()
         val budgetDao = database.budgetDao()
+        val recurringRuleDao = database.recurringRuleDao()
         val transactionDao = database.transactionDao()
         val outboxDao = database.syncOutboxDao()
         val deletionMarkerDao = database.transactionDeletionMarkerDao()
         val remoteCategoryById = categories.associateBy(CategoryEntity::id)
         val remoteBudgetById = budgets.associateBy(BudgetEntity::id)
+        val remoteRecurringRuleById = recurringRules.associateBy(RecurringRuleEntity::id)
         val remoteTransactionById = transactions.associateBy(TransactionEntity::id)
 
         database.withTransaction {
@@ -165,10 +179,12 @@ class NeonFinanceSyncRepository(
 
             if (role == ROLE_MEMBER) {
                 transactionDao.removeOthers(householdId, accountId)
+                recurringRuleDao.removeOthers(householdId, accountId)
                 budgetDao.removeOthers(householdId, accountId)
             }
 
             val localBudgetsBeforeImport = budgetDao.allForHousehold(householdId)
+            val localRecurringRulesBeforeImport = recurringRuleDao.allForHousehold(householdId)
             val localTransactionsBeforeImport = transactionDao.allForHousehold(householdId)
             val queuedBeforeImport = outboxDao.pending(accountId).associateBy { it.entityType to it.entityId }
 
@@ -191,6 +207,29 @@ class NeonFinanceSyncRepository(
             budgets.forEach { remoteBudget ->
                 if (queuedBeforeImport[ENTITY_BUDGET to remoteBudget.id] == null) {
                     budgetDao.save(remoteBudget)
+                }
+            }
+
+            recurringRules.forEach { remoteRule ->
+                if (queuedBeforeImport[ENTITY_RECURRING_RULE to remoteRule.id] == null) {
+                    recurringRuleDao.save(remoteRule)
+                }
+            }
+
+            localRecurringRulesBeforeImport.forEach { localRule ->
+                if (localRule.id in remoteRecurringRuleById) return@forEach
+                val pending = queuedBeforeImport[ENTITY_RECURRING_RULE to localRule.id]
+                if (pending == null) {
+                    recurringRuleDao.deleteById(householdId, localRule.id)
+                    return@forEach
+                }
+                val wasBasedOnPreviousSnapshot = previousSuccessfulSyncAt != null &&
+                    localRule.updatedAt <= previousSuccessfulSyncAt
+                if (localRule.isRemoteBacked && wasBasedOnPreviousSnapshot &&
+                    pending.operation == OPERATION_UPSERT
+                ) {
+                    recurringRuleDao.deleteById(householdId, localRule.id)
+                    outboxDao.removeForEntity(accountId, ENTITY_RECURRING_RULE, localRule.id)
                 }
             }
 
@@ -256,7 +295,8 @@ class NeonFinanceSyncRepository(
         accountId: String,
         householdId: String,
         remoteCategoryIds: MutableSet<String>,
-        remoteBudgetIds: MutableSet<String>
+        remoteBudgetIds: MutableSet<String>,
+        remoteRecurringRuleIds: MutableSet<String>
     ) {
         val outboxDao = database.syncOutboxDao()
         var sentCount = 0
@@ -266,8 +306,9 @@ class NeonFinanceSyncRepository(
                     compareBy<SyncOutboxEntity> {
                         when (it.entityType) {
                             ENTITY_CATEGORY -> 0
-                            ENTITY_BUDGET -> 1
-                            else -> 2
+                            ENTITY_RECURRING_RULE -> 1
+                            ENTITY_BUDGET -> 2
+                            else -> 3
                         }
                     }.thenBy(SyncOutboxEntity::enqueuedAt)
                 )
@@ -281,6 +322,13 @@ class NeonFinanceSyncRepository(
                 when (operation.entityType) {
                     ENTITY_CATEGORY -> sendCategoryOperation(database, householdId, operation, remoteCategoryIds)
                     ENTITY_BUDGET -> sendBudgetOperation(database, accountId, householdId, operation, remoteBudgetIds)
+                    ENTITY_RECURRING_RULE -> sendRecurringRuleOperation(
+                        database,
+                        accountId,
+                        householdId,
+                        operation,
+                        remoteRecurringRuleIds
+                    )
                     ENTITY_TRANSACTION -> sendTransactionOperation(database, accountId, householdId, operation)
                     else -> throw IOException("Unsupported queued finance entity type.")
                 }
@@ -376,6 +424,45 @@ class NeonFinanceSyncRepository(
         remoteBudgetIds += budget.id
         database.withTransaction {
             budgetDao.markRemoteBacked(householdId, budget.id)
+            database.syncOutboxDao().removeById(operation.id)
+        }
+    }
+
+    private suspend fun sendRecurringRuleOperation(
+        database: FinanceDatabase,
+        accountId: String,
+        householdId: String,
+        operation: SyncOutboxEntity,
+        remoteRuleIds: MutableSet<String>
+    ) {
+        if (operation.operation != OPERATION_UPSERT) {
+            throw IOException("Unsupported recurring rule operation in the finance sync queue.")
+        }
+        val ruleDao = database.recurringRuleDao()
+        val rule = ruleDao.findById(householdId, operation.entityId)
+        if (rule == null || rule.createdBy != accountId) {
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        val alreadyRemote = rule.id in remoteRuleIds
+        request(
+            resource = RECURRING_RULES_RESOURCE,
+            method = if (alreadyRemote) NeonDataApiMethod.PATCH else NeonDataApiMethod.POST,
+            query = if (alreadyRemote) {
+                mapOf(
+                    "id" to "eq.${rule.id}",
+                    "household_id" to "eq.$householdId",
+                    "created_by" to "eq.$accountId"
+                )
+            } else {
+                mapOf("on_conflict" to "id")
+            },
+            body = rule.toJson(),
+            prefer = if (alreadyRemote) null else UPSERT_PREFER
+        )
+        remoteRuleIds += rule.id
+        database.withTransaction {
+            ruleDao.markRemoteBacked(householdId, rule.id)
             database.syncOutboxDao().removeById(operation.id)
         }
     }
@@ -510,6 +597,26 @@ class NeonFinanceSyncRepository(
         )
     }
 
+    private fun JSONObject.toRecurringRule(accountId: String): RecurringRuleEntity = RecurringRuleEntity(
+        id = getString("id"),
+        accountId = accountId,
+        householdId = getString("household_id"),
+        createdBy = getString("created_by"),
+        categoryId = getString("category_id"),
+        kind = getString("kind"),
+        amountCentavos = getBigDecimal("amount").movePointRight(2).longValueExact(),
+        currency = getString("currency").trim(),
+        description = optNullableString("description"),
+        frequency = getString("frequency"),
+        intervalCount = getInt("interval_count"),
+        startOn = getString("start_on"),
+        nextDueOn = getString("next_due_on"),
+        isActive = getBoolean("is_active"),
+        createdAt = getInstantMillis("created_at"),
+        updatedAt = getInstantMillis("updated_at"),
+        isRemoteBacked = true
+    )
+
     private fun JSONObject.toTransaction(accountId: String): TransactionEntity = TransactionEntity(
         id = getString("id"),
         accountId = accountId,
@@ -523,7 +630,9 @@ class NeonFinanceSyncRepository(
         description = optNullableString("description"),
         createdAt = getInstantMillis("created_at"),
         updatedAt = getInstantMillis("updated_at"),
-        isRemoteBacked = true
+        isRemoteBacked = true,
+        sourceRecurringRuleId = optNullableString("source_recurring_rule_id"),
+        scheduledFor = optNullableString("scheduled_for")
     )
 
     private fun JSONObject.getBigDecimal(name: String): BigDecimal = try {
@@ -580,6 +689,8 @@ class NeonFinanceSyncRepository(
         .put("currency", currency)
         .put("occurred_on", occurredOn)
         .put("description", description ?: JSONObject.NULL)
+        .put("source_recurring_rule_id", sourceRecurringRuleId ?: JSONObject.NULL)
+        .put("scheduled_for", scheduledFor ?: JSONObject.NULL)
         .put("created_at", formatTimestamp(createdAt))
         .put("updated_at", formatTimestamp(updatedAt))
 
@@ -590,6 +701,21 @@ class NeonFinanceSyncRepository(
         .put("category_id", categoryId ?: JSONObject.NULL)
         .put("month_start", monthStart)
         .put("amount_limit", BigDecimal.valueOf(amountCentavos, 2).toPlainString())
+
+    private fun RecurringRuleEntity.toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("household_id", householdId)
+        .put("created_by", createdBy)
+        .put("category_id", categoryId)
+        .put("kind", kind)
+        .put("amount", BigDecimal.valueOf(amountCentavos, 2).toPlainString())
+        .put("currency", currency)
+        .put("description", description ?: JSONObject.NULL)
+        .put("frequency", frequency)
+        .put("interval_count", intervalCount)
+        .put("start_on", startOn)
+        .put("next_due_on", nextDueOn)
+        .put("is_active", isActive)
 
     private fun formatTimestamp(timestampMillis: Long): String = timestampFormatter().format(Date(timestampMillis))
 
@@ -606,16 +732,19 @@ class NeonFinanceSyncRepository(
         private const val HOUSEHOLD_MEMBERS_RESOURCE = "household_members"
         private const val CATEGORIES_RESOURCE = "categories"
         private const val BUDGETS_RESOURCE = "budgets"
+        private const val RECURRING_RULES_RESOURCE = "recurring_rules"
         private const val TRANSACTIONS_RESOURCE = "transactions"
         private const val DELETION_MARKERS_RESOURCE = "transaction_deletion_markers"
         private const val RPC_RESOURCE = "rpc"
         private const val PRUNE_MARKERS_RPC = "prune_expired_transaction_deletion_markers"
         private const val CATEGORY_COLUMNS = "id,household_id,created_by,name,kind,is_active,created_at,updated_at"
         private const val BUDGET_COLUMNS = "id,household_id,user_id,category_id,month_start,amount_limit::text,created_at,updated_at"
-        private const val TRANSACTION_COLUMNS = "id,household_id,created_by,category_id,kind,amount::text,currency,occurred_on,description,created_at,updated_at"
+        private const val RECURRING_RULE_COLUMNS = "id,household_id,created_by,category_id,kind,amount::text,currency,description,frequency,interval_count,start_on,next_due_on,is_active,created_at,updated_at"
+        private const val TRANSACTION_COLUMNS = "id,household_id,created_by,category_id,source_recurring_rule_id,scheduled_for,kind,amount::text,currency,occurred_on,description,created_at,updated_at"
         private const val DELETION_MARKER_COLUMNS = "transaction_id,household_id,created_by,deleted_at"
         private const val ENTITY_CATEGORY = "category"
         private const val ENTITY_BUDGET = "budget"
+        private const val ENTITY_RECURRING_RULE = "recurring_rule"
         private const val ENTITY_TRANSACTION = "transaction"
         private const val OPERATION_UPSERT = "upsert"
         private const val OPERATION_DELETE = "delete"
