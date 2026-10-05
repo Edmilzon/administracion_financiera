@@ -1,16 +1,16 @@
 package com.moonspace.adminfinanciera.feature.transactions.data
 
 import androidx.room.withTransaction
-import com.moonspace.adminfinanciera.core.database.BudgetEntity
-import com.moonspace.adminfinanciera.core.database.CategoryEntity
-import com.moonspace.adminfinanciera.core.database.DebtEntity
-import com.moonspace.adminfinanciera.core.database.DebtPaymentEntity
+import com.moonspace.adminfinanciera.core.database.entities.BudgetEntity
+import com.moonspace.adminfinanciera.core.database.entities.CategoryEntity
+import com.moonspace.adminfinanciera.core.database.entities.DebtEntity
+import com.moonspace.adminfinanciera.core.database.entities.DebtPaymentEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
 import com.moonspace.adminfinanciera.core.database.FinanceDatabase
-import com.moonspace.adminfinanciera.core.database.RecurringRuleEntity
-import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
-import com.moonspace.adminfinanciera.core.database.SyncStateEntity
-import com.moonspace.adminfinanciera.core.database.TransactionEntity
+import com.moonspace.adminfinanciera.core.database.entities.RecurringRuleEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncOutboxEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncStateEntity
+import com.moonspace.adminfinanciera.core.database.entities.TransactionEntity
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
 import com.moonspace.adminfinanciera.core.network.NeonDataApiMethod

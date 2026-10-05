@@ -1,10 +1,10 @@
 package com.moonspace.adminfinanciera.feature.budgets.data
 
 import androidx.room.withTransaction
-import com.moonspace.adminfinanciera.core.database.BudgetEntity
-import com.moonspace.adminfinanciera.core.database.CategoryEntity
+import com.moonspace.adminfinanciera.core.database.entities.BudgetEntity
+import com.moonspace.adminfinanciera.core.database.entities.CategoryEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
-import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncOutboxEntity
 import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
 import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetDataError
 import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetDataException

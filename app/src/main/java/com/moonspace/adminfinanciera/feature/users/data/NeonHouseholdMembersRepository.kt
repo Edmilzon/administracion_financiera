@@ -3,8 +3,8 @@ package com.moonspace.adminfinanciera.feature.users.data
 import android.content.Context
 import androidx.room.withTransaction
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
-import com.moonspace.adminfinanciera.core.database.HouseholdCacheEntity
-import com.moonspace.adminfinanciera.core.database.HouseholdMemberCacheEntity
+import com.moonspace.adminfinanciera.core.database.entities.HouseholdCacheEntity
+import com.moonspace.adminfinanciera.core.database.entities.HouseholdMemberCacheEntity
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient

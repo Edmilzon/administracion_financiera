@@ -1,10 +1,10 @@
 package com.moonspace.adminfinanciera.feature.debts.data
 
 import androidx.room.withTransaction
-import com.moonspace.adminfinanciera.core.database.DebtEntity
-import com.moonspace.adminfinanciera.core.database.DebtPaymentEntity
+import com.moonspace.adminfinanciera.core.database.entities.DebtEntity
+import com.moonspace.adminfinanciera.core.database.entities.DebtPaymentEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
-import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncOutboxEntity
 import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
 import com.moonspace.adminfinanciera.feature.debts.domain.DebtDataError
 import com.moonspace.adminfinanciera.feature.debts.domain.DebtDataException

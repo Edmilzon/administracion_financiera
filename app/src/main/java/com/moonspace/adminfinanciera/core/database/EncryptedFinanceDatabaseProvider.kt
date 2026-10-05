@@ -6,6 +6,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.room.Room
+import com.moonspace.adminfinanciera.core.database.migrations.FinanceRoomMigrations
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -34,13 +35,13 @@ class EncryptedFinanceDatabaseProvider(context: Context) {
                     FinanceDatabase::class.java,
                     "finance_$accountHash.db"
                 ).openHelperFactory(factory)
-            .addMigrations(
-                FinanceDatabase.MIGRATION_1_2,
-                FinanceDatabase.MIGRATION_2_3,
-                FinanceDatabase.MIGRATION_3_4,
-                FinanceDatabase.MIGRATION_4_5,
-                FinanceDatabase.MIGRATION_5_6
-            )
+                    .addMigrations(
+                        FinanceRoomMigrations.MIGRATION_1_2,
+                        FinanceRoomMigrations.MIGRATION_2_3,
+                        FinanceRoomMigrations.MIGRATION_3_4,
+                        FinanceRoomMigrations.MIGRATION_4_5,
+                        FinanceRoomMigrations.MIGRATION_5_6
+                    )
                     .build(),
                 passphrase = passphrase
             )

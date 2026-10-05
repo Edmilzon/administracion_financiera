@@ -1,11 +1,11 @@
 package com.moonspace.adminfinanciera.feature.recurring.data
 
 import androidx.room.withTransaction
-import com.moonspace.adminfinanciera.core.database.CategoryEntity
-import com.moonspace.adminfinanciera.core.database.RecurringRuleEntity
+import com.moonspace.adminfinanciera.core.database.entities.CategoryEntity
+import com.moonspace.adminfinanciera.core.database.entities.RecurringRuleEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
-import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
-import com.moonspace.adminfinanciera.core.database.TransactionEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncOutboxEntity
+import com.moonspace.adminfinanciera.core.database.entities.TransactionEntity
 import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
 import com.moonspace.adminfinanciera.core.sync.RecurringReminderScheduler
 import com.moonspace.adminfinanciera.feature.recurring.domain.FinanceRecurringRule

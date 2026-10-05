@@ -1,11 +1,11 @@
 package com.moonspace.adminfinanciera.feature.transactions.data
 
 import androidx.room.withTransaction
-import com.moonspace.adminfinanciera.core.database.CategoryEntity
+import com.moonspace.adminfinanciera.core.database.entities.CategoryEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
-import com.moonspace.adminfinanciera.core.database.SyncOutboxEntity
-import com.moonspace.adminfinanciera.core.database.TransactionDeletionMarkerEntity
-import com.moonspace.adminfinanciera.core.database.TransactionEntity
+import com.moonspace.adminfinanciera.core.database.entities.SyncOutboxEntity
+import com.moonspace.adminfinanciera.core.database.entities.TransactionDeletionMarkerEntity
+import com.moonspace.adminfinanciera.core.database.entities.TransactionEntity
 import com.moonspace.adminfinanciera.core.sync.FinanceSyncScheduler
 import com.moonspace.adminfinanciera.feature.transactions.domain.CategoryDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceCategory
@@ -71,7 +71,7 @@ class RoomFinancialRepository(
             val cached = database.householdCacheDao().getHousehold(accountId)
             if (cached == null || cached.householdId != householdId || cached.currentUserRole != role) {
                 database.householdCacheDao().saveHousehold(
-                    com.moonspace.adminfinanciera.core.database.HouseholdCacheEntity(
+                    com.moonspace.adminfinanciera.core.database.entities.HouseholdCacheEntity(
                         accountId = accountId,
                         householdId = householdId,
                         currentUserRole = role,
