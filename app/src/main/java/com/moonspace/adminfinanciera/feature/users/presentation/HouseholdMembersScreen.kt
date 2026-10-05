@@ -46,7 +46,8 @@ import com.moonspace.adminfinanciera.feature.users.domain.HouseholdRole
 fun HouseholdMembersScreen(
     user: AuthUser,
     state: HouseholdMembersUiState,
-    onBack: () -> Unit,
+    isSigningOut: Boolean,
+    onSignOut: () -> Unit,
     onRefresh: () -> Unit,
     onCreateHousehold: (String) -> Unit,
     onCreateMember: (String, String, HouseholdRole) -> Unit,
@@ -73,12 +74,14 @@ fun HouseholdMembersScreen(
             .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Large),
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Large)
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             FinanceButton(
-                label = stringResource(R.string.users_back),
-                onClick = onBack,
+                label = stringResource(R.string.users_sign_out),
+                onClick = onSignOut,
                 variant = FinanceButtonVariant.Secondary,
-                enabled = !state.isSubmitting
+                enabled = !state.isSubmitting && !isSigningOut,
+                isLoading = isSigningOut,
+                loadingLabel = stringResource(R.string.users_signing_out)
             )
         }
 

@@ -41,7 +41,11 @@ fun ReportSummaryCard(report: FinanceReport, modifier: Modifier = Modifier) {
             SummaryRow(
                 label = stringResource(R.string.reports_net),
                 amount = formatReportMoney(report.total.netCentavos),
-                kind = FinanceAmountKind.Neutral
+                kind = when (report.total.netCentavos.signum()) {
+                    1 -> FinanceAmountKind.PositiveBalance
+                    -1 -> FinanceAmountKind.NegativeBalance
+                    else -> FinanceAmountKind.Neutral
+                }
             )
             Text(
                 text = pluralStringResource(
@@ -108,16 +112,27 @@ fun ReportBreakdownCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Text(
-                        text = stringResource(
-                            R.string.reports_breakdown_values,
-                            formatReportMoney(item.incomeCentavos),
-                            formatReportMoney(item.expenseCentavos),
-                            formatReportMoney(item.netCentavos)
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
+                        SummaryRow(
+                            label = stringResource(R.string.reports_income),
+                            amount = formatReportMoney(item.incomeCentavos),
+                            kind = FinanceAmountKind.Income
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.reports_expense),
+                            amount = formatReportMoney(item.expenseCentavos),
+                            kind = FinanceAmountKind.Expense
+                        )
+                        SummaryRow(
+                            label = stringResource(R.string.reports_net),
+                            amount = formatReportMoney(item.netCentavos),
+                            kind = when (item.netCentavos.signum()) {
+                                1 -> FinanceAmountKind.PositiveBalance
+                                -1 -> FinanceAmountKind.NegativeBalance
+                                else -> FinanceAmountKind.Neutral
+                            }
+                        )
+                    }
                 }
             }
         }

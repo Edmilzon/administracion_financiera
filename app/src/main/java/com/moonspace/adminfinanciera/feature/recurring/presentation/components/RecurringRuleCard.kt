@@ -93,7 +93,7 @@ fun RecurringRuleCard(
                 FinanceAmountText(
                     formattedAmount = amount,
                     kind = kind,
-                    accessibilityLabel = amount,
+                    accessibilityLabel = "${stringResource(if (rule.kind == TransactionKind.Income) R.string.transactions_income else R.string.transactions_expense)}, $amount",
                     emphasized = true
                 )
             }

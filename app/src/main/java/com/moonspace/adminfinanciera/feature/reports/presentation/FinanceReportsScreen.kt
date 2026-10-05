@@ -59,7 +59,6 @@ import java.io.FileInputStream
 @Composable
 fun FinanceReportsScreen(
     state: FinanceReportsUiState,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
     onSelectStartDate: (String) -> Unit,
     onSelectEndDate: (String) -> Unit,
@@ -163,11 +162,6 @@ fun FinanceReportsScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                FinanceButton(
-                    label = stringResource(R.string.reports_back),
-                    onClick = onBack,
-                    variant = FinanceButtonVariant.Text
-                )
                 Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
                     Text(
                         text = stringResource(R.string.reports_title),

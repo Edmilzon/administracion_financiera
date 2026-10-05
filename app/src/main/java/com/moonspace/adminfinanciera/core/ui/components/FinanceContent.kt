@@ -25,6 +25,8 @@ import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 enum class FinanceAmountKind {
     Income,
     Expense,
+    PositiveBalance,
+    NegativeBalance,
     Neutral
 }
 
@@ -37,13 +39,13 @@ fun FinanceAmountText(
     emphasized: Boolean = false
 ) {
     val palette = FinanceSemanticColorScheme
-    val (sign, color) = when (kind) {
-        FinanceAmountKind.Income -> "+" to palette.success
-        FinanceAmountKind.Expense -> "−" to palette.expense
-        FinanceAmountKind.Neutral -> "" to MaterialTheme.colorScheme.onSurface
+    val color = when (kind) {
+        FinanceAmountKind.Income, FinanceAmountKind.PositiveBalance -> palette.success
+        FinanceAmountKind.Expense, FinanceAmountKind.NegativeBalance -> palette.expense
+        FinanceAmountKind.Neutral -> MaterialTheme.colorScheme.onSurface
     }
     Text(
-        text = "$sign$formattedAmount",
+        text = formattedAmount.filterNot { it == '+' || it == '-' || it == '−' },
         modifier = modifier.semantics { contentDescription = accessibilityLabel },
         style = if (emphasized) FinanceAmountStyle else MaterialTheme.typography.titleMedium,
         color = color,

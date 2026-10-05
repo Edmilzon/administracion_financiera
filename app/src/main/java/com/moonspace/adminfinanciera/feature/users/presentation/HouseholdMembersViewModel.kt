@@ -1,6 +1,7 @@
 package com.moonspace.adminfinanciera.feature.users.presentation
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,6 +15,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 
 data class HouseholdMembersUiState(
     val isLoading: Boolean = false,
@@ -31,24 +34,38 @@ class HouseholdMembersViewModel(
     private val _uiState = MutableStateFlow(HouseholdMembersUiState())
     val uiState: StateFlow<HouseholdMembersUiState> = _uiState.asStateFlow()
     private var loadedUserId: String? = null
+    private var loadJob: Job? = null
+    private var lastLoadAttemptAt = 0L
 
-    fun load(currentUser: AuthUser) {
-        if (_uiState.value.isLoading || _uiState.value.isSubmitting) return
+    fun load(currentUser: AuthUser, forceRefresh: Boolean = false) {
         val userChanged = loadedUserId != currentUser.id
+        val now = SystemClock.elapsedRealtime()
+        if (!userChanged && !forceRefresh &&
+            (loadJob?.isActive == true || now - lastLoadAttemptAt < SCREEN_CACHE_TTL_MILLIS)
+        ) return
+        if (_uiState.value.isSubmitting) return
+        if (userChanged) {
+            loadJob?.cancel()
+            lastLoadAttemptAt = 0L
+        }
         loadedUserId = currentUser.id
+        lastLoadAttemptAt = SystemClock.elapsedRealtime()
         _uiState.value = _uiState.value.copy(
             isLoading = true,
             snapshot = if (userChanged) null else _uiState.value.snapshot,
             errorMessage = null,
             noticeMessage = null
         )
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     snapshot = repository.load(currentUser),
                     errorMessage = null
                 )
+                lastLoadAttemptAt = SystemClock.elapsedRealtime()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -90,6 +107,13 @@ class HouseholdMembersViewModel(
         }
     }
 
+    fun clearAccountContext() {
+        loadJob?.cancel()
+        loadedUserId = null
+        lastLoadAttemptAt = 0L
+        _uiState.value = HouseholdMembersUiState()
+    }
+
     private fun submit(
         currentUser: AuthUser,
         action: suspend () -> String
@@ -100,6 +124,7 @@ class HouseholdMembersViewModel(
             try {
                 val notice = action()
                 val snapshot = repository.load(currentUser)
+                lastLoadAttemptAt = SystemClock.elapsedRealtime()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isSubmitting = false,
@@ -123,6 +148,11 @@ class HouseholdMembersViewModel(
         else -> appContext.getString(R.string.users_request_failed)
     }
 
+    override fun onCleared() {
+        loadJob?.cancel()
+        super.onCleared()
+    }
+
     class Factory(
         private val context: Context,
         private val repository: HouseholdMembersRepository
@@ -134,3 +164,5 @@ class HouseholdMembersViewModel(
         }
     }
 }
+
+private const val SCREEN_CACHE_TTL_MILLIS = 60_000L

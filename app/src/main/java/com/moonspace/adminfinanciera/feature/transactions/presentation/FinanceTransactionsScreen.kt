@@ -75,7 +75,6 @@ import java.text.NumberFormat
 fun FinanceTransactionsScreen(
     user: AuthUser,
     state: FinanceTransactionsUiState,
-    onBack: () -> Unit,
     onOpenUsers: () -> Unit,
     onRefresh: () -> Unit,
     onSaveTransaction: (TransactionDraft) -> Unit,
@@ -131,11 +130,6 @@ fun FinanceTransactionsScreen(
             .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Medium),
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
-        FinanceButton(
-            label = stringResource(R.string.transactions_back),
-            onClick = onBack,
-            variant = FinanceButtonVariant.Text
-        )
         Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
             Text(
                 text = stringResource(R.string.transactions_title),
@@ -521,6 +515,19 @@ private fun SummaryAmountRow(
     } else {
         formatBobs(amountCentavos)
     }
+    val amountKind = when {
+        kind != FinanceAmountKind.Neutral -> kind
+        amountCentavos.signum() > 0 -> FinanceAmountKind.PositiveBalance
+        amountCentavos.signum() < 0 -> FinanceAmountKind.NegativeBalance
+        else -> FinanceAmountKind.Neutral
+    }
+    val semanticLabel = when (amountKind) {
+        FinanceAmountKind.Income -> stringResource(R.string.transactions_income)
+        FinanceAmountKind.Expense -> stringResource(R.string.transactions_expense)
+        FinanceAmountKind.PositiveBalance -> stringResource(R.string.transactions_positive_balance)
+        FinanceAmountKind.NegativeBalance -> stringResource(R.string.transactions_negative_balance)
+        FinanceAmountKind.Neutral -> label
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
@@ -534,9 +541,10 @@ private fun SummaryAmountRow(
         )
         FinanceAmountText(
             formattedAmount = amount,
-            kind = kind,
-            accessibilityLabel = "$label, $amount",
-            emphasized = kind == FinanceAmountKind.Neutral
+            kind = amountKind,
+            accessibilityLabel = "$semanticLabel, $amount",
+            emphasized = amountKind == FinanceAmountKind.PositiveBalance ||
+                amountKind == FinanceAmountKind.NegativeBalance || amountKind == FinanceAmountKind.Neutral
         )
     }
 }
@@ -594,7 +602,7 @@ private fun TransactionCard(
                         formattedAmount = formatBobs(transaction.amountCentavos),
                         kind = if (transaction.kind == TransactionKind.Income) FinanceAmountKind.Income
                         else FinanceAmountKind.Expense,
-                        accessibilityLabel = formatBobs(transaction.amountCentavos),
+                        accessibilityLabel = "${kindLabel(transaction.kind)}, ${formatBobs(transaction.amountCentavos)}",
                         emphasized = true
                     )
                 }

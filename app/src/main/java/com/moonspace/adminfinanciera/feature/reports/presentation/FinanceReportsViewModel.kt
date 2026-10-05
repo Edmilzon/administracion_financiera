@@ -1,6 +1,7 @@
 package com.moonspace.adminfinanciera.feature.reports.presentation
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -62,14 +64,23 @@ class FinanceReportsViewModel(
     val uiState: StateFlow<FinanceReportsUiState> = _uiState.asStateFlow()
     private var currentUser: AuthUser? = null
     private var loadJob: Job? = null
+    private var transactionJob: Job? = null
+    private var categoryJob: Job? = null
+    private var pendingJob: Job? = null
+    private var lastLoadAttemptAt = 0L
     private var transactions: List<FinanceTransaction> = emptyList()
     private var categories: List<FinanceCategory> = emptyList()
     private var members: List<HouseholdMember> = emptyList()
     private var householdId: String? = null
     private var role: HouseholdRole? = null
 
-    fun load(user: AuthUser) {
+    fun load(user: AuthUser, forceRefresh: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (currentUser?.id == user.id && !forceRefresh &&
+            (loadJob?.isActive == true || now - lastLoadAttemptAt < SCREEN_CACHE_TTL_MILLIS)
+        ) return
         if (currentUser?.id != user.id) {
+            stopObserving()
             clearSource()
             currentUser = user
             _uiState.value = FinanceReportsUiState(
@@ -77,16 +88,18 @@ class FinanceReportsViewModel(
                 selectedStartOn = currentMonthStart(),
                 selectedEndOn = todayIsoDate()
             )
-        } else {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
         }
         loadJob?.cancel()
+        lastLoadAttemptAt = SystemClock.elapsedRealtime()
+        val hasCachedReport = _uiState.value.report != null
+        _uiState.value = _uiState.value.copy(isLoading = !hasCachedReport, errorMessage = null)
         loadJob = viewModelScope.launch {
             try {
                 val snapshot = householdMembersRepository.load(user)
                 val currentHouseholdId = snapshot.householdId
                 val currentRole = snapshot.currentUserRole
                 if (currentHouseholdId.isNullOrBlank() || currentRole == null) {
+                    stopObserving()
                     clearSource()
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -127,14 +140,16 @@ class FinanceReportsViewModel(
                     actionErrorMessage = null
                 )
                 rebuildReport(user)
+                startObserving(user, currentHouseholdId, canReadWholeHousehold)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
+                val canKeepCachedReport = _uiState.value.report != null
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    hasHousehold = false,
-                    report = null,
-                    errorMessage = appContext.getString(R.string.reports_load_failed)
+                    hasHousehold = canKeepCachedReport,
+                    errorMessage = if (canKeepCachedReport) null
+                    else appContext.getString(R.string.reports_load_failed)
                 )
             }
         }
@@ -211,7 +226,9 @@ class FinanceReportsViewModel(
 
     fun clearAccountContext() {
         loadJob?.cancel()
+        stopObserving()
         currentUser = null
+        lastLoadAttemptAt = 0L
         clearSource()
         _uiState.value = FinanceReportsUiState(isLoading = false)
     }
@@ -252,11 +269,48 @@ class FinanceReportsViewModel(
     }
 
     private fun clearSource() {
+        stopObserving()
         transactions = emptyList()
         categories = emptyList()
         members = emptyList()
         householdId = null
         role = null
+    }
+
+    private fun startObserving(user: AuthUser, currentHouseholdId: String, canReadWholeHousehold: Boolean) {
+        stopObserving()
+        transactionJob = viewModelScope.launch {
+            financialRepository.observeTransactions(
+                accountId = user.id,
+                householdId = currentHouseholdId,
+                userId = user.id,
+                canReadWholeHousehold = canReadWholeHousehold
+            ).collect { updated ->
+                transactions = updated
+                rebuildReport(user)
+            }
+        }
+        categoryJob = viewModelScope.launch {
+            financialRepository.observeCategories(user.id, currentHouseholdId, includeInactive = true)
+                .collect { updated ->
+                    categories = updated
+                    rebuildReport(user)
+                }
+        }
+        pendingJob = viewModelScope.launch {
+            financialRepository.observePendingCount(user.id).collect { count ->
+                _uiState.value = _uiState.value.copy(pendingSyncCount = count)
+            }
+        }
+    }
+
+    private fun stopObserving() {
+        transactionJob?.cancel()
+        categoryJob?.cancel()
+        pendingJob?.cancel()
+        transactionJob = null
+        categoryJob = null
+        pendingJob = null
     }
 
     override fun onCleared() {
@@ -284,6 +338,8 @@ class FinanceReportsViewModel(
         }
     }
 }
+
+private const val SCREEN_CACHE_TTL_MILLIS = 60_000L
 
 private fun currentMonthStart(): String = todayIsoDate().substringBeforeLast('-') + "-01"
 

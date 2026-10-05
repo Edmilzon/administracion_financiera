@@ -40,7 +40,6 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceNavigationDestina
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
 import com.moonspace.adminfinanciera.feature.auth.presentation.AuthViewModel
 import com.moonspace.adminfinanciera.feature.auth.presentation.LoginScreen
-import com.moonspace.adminfinanciera.feature.dashboard.presentation.DashboardScreen
 import com.moonspace.adminfinanciera.feature.budgets.presentation.FinanceBudgetsScreen
 import com.moonspace.adminfinanciera.feature.budgets.presentation.FinanceBudgetsViewModel
 import com.moonspace.adminfinanciera.feature.transactions.presentation.FinanceTransactionsScreen
@@ -132,14 +131,22 @@ fun FinanceNavigation() {
                 if (activity?.intent?.getBooleanExtra(com.moonspace.adminfinanciera.app.MainActivity.EXTRA_OPEN_RECURRING, false) == true) {
                     DESTINATION_RECURRING
                 } else {
-                    DESTINATION_DASHBOARD
+                    DESTINATION_TRANSACTIONS
                 }
             )
         }
         var askedForNotificationPermission by rememberSaveable(user.id) { mutableStateOf(false) }
+        val activeDestination = destination.takeIf { it in AUTHENTICATED_DESTINATIONS }
+            ?: DESTINATION_TRANSACTIONS
+
+        LaunchedEffect(destination) {
+            if (destination !in AUTHENTICATED_DESTINATIONS) {
+                destination = DESTINATION_TRANSACTIONS
+            }
+        }
 
         LaunchedEffect(user.id, destination) {
-            when (destination) {
+            when (activeDestination) {
                 DESTINATION_USERS -> membersViewModel.load(user)
                 DESTINATION_TRANSACTIONS -> transactionsViewModel.load(user)
                 DESTINATION_BUDGETS -> budgetsViewModel.load(user)
@@ -163,7 +170,6 @@ fun FinanceNavigation() {
 
         val navigationDestinations = remember {
             listOf(
-                FinanceNavigationDestination(DESTINATION_DASHBOARD, R.string.nav_home, R.drawable.ic_nav_home),
                 FinanceNavigationDestination(
                     DESTINATION_TRANSACTIONS,
                     R.string.nav_transactions,
@@ -191,7 +197,7 @@ fun FinanceNavigation() {
             ),
             bottomBar = {
                 FinanceBottomNavigationBar(
-                    selectedDestination = destination,
+                    selectedDestination = activeDestination,
                     destinations = navigationDestinations,
                     onDestinationSelected = { destination = it }
                 )
@@ -202,12 +208,23 @@ fun FinanceNavigation() {
                     .fillMaxSize()
                     .padding(contentPadding)
             ) {
-                if (destination == DESTINATION_USERS) {
+                if (activeDestination == DESTINATION_USERS) {
                     HouseholdMembersScreen(
                         user = user,
                         state = membersState,
-                        onBack = { destination = DESTINATION_DASHBOARD },
-                        onRefresh = { membersViewModel.load(user) },
+                        isSigningOut = uiState.isSubmitting,
+                        onSignOut = {
+                            membersViewModel.clearAccountContext()
+                            transactionsViewModel.clearAccountContext()
+                            budgetsViewModel.clearAccountContext()
+                            recurringViewModel.clearAccountContext()
+                            reportsViewModel.clearAccountContext()
+                            container.syncScheduler.cancelAccount(user.id)
+                            container.recurringReminderScheduler.cancelAccount(user.id)
+                            container.closeFinancialDatabases()
+                            authViewModel.signOut()
+                        },
+                        onRefresh = { membersViewModel.load(user, forceRefresh = true) },
                         onCreateHousehold = { membersViewModel.createHousehold(user, it) },
                         onCreateMember = { email, password, role ->
                             membersViewModel.createMember(user, email, password, role)
@@ -215,13 +232,12 @@ fun FinanceNavigation() {
                         onUpdateRole = { userId, role -> membersViewModel.updateRole(user, userId, role) },
                         onRemoveMember = { userId -> membersViewModel.removeMember(user, userId) }
                     )
-                } else if (destination == DESTINATION_TRANSACTIONS) {
+                } else if (activeDestination == DESTINATION_TRANSACTIONS) {
                     FinanceTransactionsScreen(
                         user = user,
                         state = transactionsState,
-                        onBack = { destination = DESTINATION_DASHBOARD },
                         onOpenUsers = { destination = DESTINATION_USERS },
-                        onRefresh = { transactionsViewModel.load(user) },
+                        onRefresh = { transactionsViewModel.load(user, forceRefresh = true) },
                         onSaveTransaction = transactionsViewModel::saveTransaction,
                         onDeleteTransaction = transactionsViewModel::deleteTransaction,
                         onSaveCategory = transactionsViewModel::saveCategory,
@@ -232,35 +248,32 @@ fun FinanceNavigation() {
                         onClearFilters = transactionsViewModel::clearFilters,
                         onClearMessages = transactionsViewModel::clearMessages
                     )
-                } else if (destination == DESTINATION_BUDGETS) {
+                } else if (activeDestination == DESTINATION_BUDGETS) {
                     FinanceBudgetsScreen(
                         user = user,
                         state = budgetsState,
-                        onBack = { destination = DESTINATION_DASHBOARD },
                         onOpenUsers = { destination = DESTINATION_USERS },
-                        onRefresh = { budgetsViewModel.load(user) },
+                        onRefresh = { budgetsViewModel.load(user, forceRefresh = true) },
                         onSaveBudget = budgetsViewModel::saveBudget,
                         onDeleteBudget = budgetsViewModel::deleteBudget,
                         onMoveMonth = budgetsViewModel::moveMonthBy,
                         onClearMessages = budgetsViewModel::clearMessages
                     )
-                } else if (destination == DESTINATION_RECURRING) {
+                } else if (activeDestination == DESTINATION_RECURRING) {
                     FinanceRecurringScreen(
                         user = user,
                         state = recurringState,
-                        onBack = { destination = DESTINATION_DASHBOARD },
                         onOpenUsers = { destination = DESTINATION_USERS },
-                        onRefresh = { recurringViewModel.load(user) },
+                        onRefresh = { recurringViewModel.load(user, forceRefresh = true) },
                         onSaveRule = recurringViewModel::saveRule,
                         onSetRuleActive = recurringViewModel::setRuleActive,
                         onConfirmOccurrence = recurringViewModel::confirmOccurrence,
                         onClearMessages = recurringViewModel::clearMessages
                     )
-                } else if (destination == DESTINATION_REPORTS) {
+                } else if (activeDestination == DESTINATION_REPORTS) {
                     FinanceReportsScreen(
                         state = reportsState,
-                        onBack = { destination = DESTINATION_DASHBOARD },
-                        onRefresh = { reportsViewModel.load(user) },
+                        onRefresh = { reportsViewModel.load(user, forceRefresh = true) },
                         onSelectStartDate = reportsViewModel::selectStartDate,
                         onSelectEndDate = reportsViewModel::selectEndDate,
                         onSelectKind = reportsViewModel::selectKind,
@@ -269,26 +282,6 @@ fun FinanceNavigation() {
                         onResetFilters = reportsViewModel::resetFilters,
                         onGenerate = reportsViewModel::generate,
                         onDeliveryFailed = reportsViewModel::reportDeliveryFailed
-                    )
-                } else {
-                    DashboardScreen(
-                        user = user,
-                        isSigningOut = uiState.isSubmitting,
-                        onSignOut = {
-                            transactionsViewModel.clearAccountContext()
-                            budgetsViewModel.clearAccountContext()
-                            recurringViewModel.clearAccountContext()
-                            reportsViewModel.clearAccountContext()
-                            container.syncScheduler.cancelAccount(user.id)
-                            container.recurringReminderScheduler.cancelAccount(user.id)
-                            container.closeFinancialDatabases()
-                            authViewModel.signOut()
-                        },
-                        onOpenUsers = { destination = DESTINATION_USERS },
-                        onOpenTransactions = { destination = DESTINATION_TRANSACTIONS },
-                        onOpenBudgets = { destination = DESTINATION_BUDGETS },
-                        onOpenRecurring = { destination = DESTINATION_RECURRING },
-                        onOpenReports = { destination = DESTINATION_REPORTS }
                     )
                 }
             }
@@ -305,12 +298,18 @@ fun FinanceNavigation() {
     }
 }
 
-private const val DESTINATION_DASHBOARD = "dashboard"
 private const val DESTINATION_USERS = "users"
 private const val DESTINATION_TRANSACTIONS = "transactions"
 private const val DESTINATION_BUDGETS = "budgets"
 private const val DESTINATION_RECURRING = "recurring"
 private const val DESTINATION_REPORTS = "reports"
+private val AUTHENTICATED_DESTINATIONS = setOf(
+    DESTINATION_USERS,
+    DESTINATION_TRANSACTIONS,
+    DESTINATION_BUDGETS,
+    DESTINATION_RECURRING,
+    DESTINATION_REPORTS
+)
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

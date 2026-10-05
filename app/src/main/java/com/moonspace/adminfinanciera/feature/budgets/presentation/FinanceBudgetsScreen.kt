@@ -51,6 +51,7 @@ import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceAmountField
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.forms.parsePositiveAmountToCentavos
+import com.moonspace.adminfinanciera.core.ui.theme.FinanceSemanticColorScheme
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetDraft
@@ -72,7 +73,6 @@ import java.util.TimeZone
 fun FinanceBudgetsScreen(
     user: AuthUser,
     state: FinanceBudgetsUiState,
-    onBack: () -> Unit,
     onOpenUsers: () -> Unit,
     onRefresh: () -> Unit,
     onSaveBudget: (BudgetDraft) -> Unit,
@@ -142,11 +142,6 @@ fun FinanceBudgetsScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                FinanceButton(
-                    label = stringResource(R.string.budgets_back),
-                    onClick = onBack,
-                    variant = FinanceButtonVariant.Text
-                )
                 Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
                     Text(
                         text = stringResource(R.string.budgets_title),
@@ -437,8 +432,11 @@ private fun BudgetUsageCard(
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth(),
-                color = if (usage.usedCentavos > limit) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary
+                color = if (usage.usedCentavos > limit) {
+                    FinanceSemanticColorScheme.expense
+                } else {
+                    FinanceSemanticColorScheme.success
+                }
             )
             Text(
                 text = stringResource(

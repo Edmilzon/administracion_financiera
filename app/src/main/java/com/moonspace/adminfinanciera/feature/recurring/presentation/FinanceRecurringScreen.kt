@@ -46,7 +46,6 @@ import kotlinx.coroutines.delay
 fun FinanceRecurringScreen(
     user: AuthUser,
     state: FinanceRecurringUiState,
-    onBack: () -> Unit,
     onOpenUsers: () -> Unit,
     onRefresh: () -> Unit,
     onSaveRule: (RecurringRuleDraft) -> Unit,
@@ -99,11 +98,6 @@ fun FinanceRecurringScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                FinanceButton(
-                    label = stringResource(R.string.recurring_back),
-                    onClick = onBack,
-                    variant = FinanceButtonVariant.Text
-                )
                 Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
                     Text(
                         text = stringResource(R.string.recurring_title),

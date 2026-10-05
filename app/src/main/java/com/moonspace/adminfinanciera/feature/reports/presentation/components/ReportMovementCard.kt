@@ -65,7 +65,7 @@ fun ReportMovementCard(row: FinanceReportRow, modifier: Modifier = Modifier) {
             FinanceAmountText(
                 formattedAmount = formatReportMoney(row.amountCentavos),
                 kind = if (row.kind == TransactionKind.Income) FinanceAmountKind.Income else FinanceAmountKind.Expense,
-                accessibilityLabel = formatReportMoney(row.amountCentavos),
+                accessibilityLabel = "${if (row.kind == TransactionKind.Income) stringResource(R.string.transactions_income) else stringResource(R.string.transactions_expense)}, ${formatReportMoney(row.amountCentavos)}",
                 emphasized = true
             )
         }

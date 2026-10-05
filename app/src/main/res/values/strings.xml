@@ -27,27 +27,8 @@
     <string name="login_submitting">Verificando…</string>
     <string name="login_invalid_credentials">Correo o contraseña incorrectos.</string>
     <string name="session_loading">Comprobando tu sesión…</string>
-    <string name="home_eyebrow">ESPACIO COMPARTIDO</string>
-    <string name="home_title">Tu espacio financiero</string>
-    <string name="home_signed_in_as">Sesión iniciada como %1$s</string>
-    <string name="home_summary_title">Tu actividad, en un solo lugar</string>
-    <string name="home_summary_description">Registra y consulta tus ingresos y gastos desde la sección Movimientos.</string>
-    <string name="home_next_step">Movimientos y Usuarios están disponibles. Las demás secciones se habilitarán después.</string>
-    <string name="home_storage_pending">Tu sesión usa Neon Auth. Los movimientos se guardan en el teléfono y quedan pendientes de sincronización con Neon.</string>
-    <string name="home_menu_title">Menú</string>
-    <string name="menu_transactions">Movimientos</string>
-    <string name="menu_transactions_description">Registrar y consultar ingresos y gastos</string>
-    <string name="menu_budgets">Presupuestos</string>
-    <string name="menu_budgets_description">Límites mensuales para ingresos y gastos</string>
-    <string name="menu_recurring">Recurrentes</string>
-    <string name="menu_recurring_description">Programa y confirma tus movimientos periódicos</string>
-    <string name="menu_reports">Reportes</string>
-    <string name="menu_reports_description">Exportar PDF o Excel</string>
-    <string name="menu_users">Usuarios</string>
-    <string name="menu_users_description">Cuentas, integrantes y roles</string>
-    <string name="menu_coming_soon">Próximamente</string>
-    <string name="menu_open">Abrir</string>
-    <string name="users_back">Volver al menú</string>
+    <string name="users_sign_out">Cerrar sesión</string>
+    <string name="users_signing_out">Cerrando sesión…</string>
     <string name="users_title">Integrantes y roles</string>
     <string name="users_description">Administra las cuentas que tienen acceso a este espacio financiero.</string>
     <string name="users_loading">Cargando integrantes…</string>
@@ -97,7 +78,6 @@
     <string name="users_connection_failed">No se pudo conectar con Neon. Revisa tu conexión e inténtalo de nuevo.</string>
     <string name="users_http_error">Neon respondió con HTTP %1$d. Revisa que las migraciones y la Data API estén configuradas.</string>
     <string name="users_invalid_response">Neon devolvió una respuesta que la app no pudo interpretar.</string>
-    <string name="transactions_back">Volver al menú</string>
     <string name="transactions_title">Movimientos</string>
     <string name="transactions_description">Registra y consulta los ingresos y gastos de este espacio.</string>
     <string name="transactions_filter_title">Filtros</string>
@@ -115,6 +95,8 @@
     <string name="transactions_summary_income">Ingresos</string>
     <string name="transactions_summary_expenses">Gastos</string>
     <string name="transactions_summary_balance">Diferencia</string>
+    <string name="transactions_positive_balance">Saldo positivo</string>
+    <string name="transactions_negative_balance">Saldo negativo</string>
     <string name="transactions_category_breakdown">Totales por categoría</string>
     <string name="transactions_member_breakdown">Totales por persona</string>
     <string name="transactions_list_title">Movimientos</string>
@@ -160,7 +142,6 @@
     <string name="transactions_deleting">Eliminando…</string>
     <string name="transactions_registered_by_you">Registrado por ti</string>
     <string name="transactions_registered_by_member">Registrado por %1$s</string>
-    <string name="budgets_back">Volver al menú</string>
     <string name="budgets_title">Presupuestos</string>
     <string name="budgets_description">Los límites generales suman en bruto ingresos y gastos; los de categoría siguen sus movimientos. Administra los tuyos y consulta los del espacio.</string>
     <string name="budgets_loading">Cargando presupuestos…</string>
@@ -209,7 +190,6 @@
     <string name="budgets_permission_denied">Solo puedes crear, editar o eliminar tus propios presupuestos.</string>
     <string name="budgets_record_unavailable">Ese presupuesto ya no está disponible o no tienes permiso para modificarlo.</string>
     <string name="budgets_operation_failed">No se pudo guardar el cambio. Inténtalo de nuevo.</string>
-    <string name="recurring_back">Volver al menú</string>
     <string name="recurring_title">Recurrentes</string>
     <string name="recurring_description">Programa ingresos y gastos periódicos. Cada vencimiento necesita tu confirmación antes de registrarse.</string>
     <string name="recurring_loading">Cargando reglas recurrentes…</string>
@@ -278,9 +258,6 @@
     <string name="categories_admin_only">Solo el administrador puede gestionar categorías.</string>
     <string name="ui_cancel">Cancelar</string>
     <string name="ui_confirm">Confirmar</string>
-    <string name="home_sign_out">Cerrar sesión</string>
-    <string name="home_signing_out">Cerrando sesión…</string>
-    <string name="nav_home">Inicio</string>
     <string name="nav_transactions">Movimientos</string>
     <string name="nav_budgets">Presupuestos</string>
     <string name="nav_recurring">Recurrentes</string>
@@ -315,7 +292,6 @@
         <item quantity="one">Cada %1$d mes</item>
         <item quantity="other">Cada %1$d meses</item>
     </plurals>
-    <string name="reports_back">Volver al menú</string>
     <string name="reports_title">Informes</string>
     <string name="reports_description">Consulta tus ingresos y gastos y prepara archivos para guardar, compartir o imprimir.</string>
     <string name="reports_local_data_note">El informe usa los movimientos guardados en este teléfono. También incluye cambios que esperan sincronización.</string>
@@ -349,7 +325,6 @@
     <string name="reports_no_movements_title">Sin movimientos para estos filtros</string>
     <string name="reports_no_movements_description">Cambia el período o ajusta el tipo, categoría o persona para ver otros resultados.</string>
     <string name="reports_movement_metadata">%1$s · %2$s · %3$s</string>
-    <string name="reports_breakdown_values">Ingresos: %1$s · Gastos: %2$s · Diferencia: %3$s</string>
     <string name="reports_export_title">Exportar informe</string>
     <string name="reports_export_description">El PDF se puede imprimir. Guarda el archivo en tu teléfono o compártelo con otra aplicación.</string>
     <string name="reports_generate_pdf">Generar PDF</string>

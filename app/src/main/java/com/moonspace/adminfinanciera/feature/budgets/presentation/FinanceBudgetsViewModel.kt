@@ -1,6 +1,7 @@
 package com.moonspace.adminfinanciera.feature.budgets.presentation
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,15 +70,23 @@ class FinanceBudgetsViewModel(
     private var transactionJob: Job? = null
     private var budgetJob: Job? = null
     private var pendingJob: Job? = null
+    private var lastLoadAttemptAt = 0L
 
-    fun load(user: AuthUser) {
+    fun load(user: AuthUser, forceRefresh: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (currentUser?.id == user.id && !forceRefresh &&
+            (loadJob?.isActive == true || now - lastLoadAttemptAt < SCREEN_CACHE_TTL_MILLIS)
+        ) return
         if (currentUser?.id != user.id) {
             stopObserving()
             currentUser = user
             _uiState.value = FinanceBudgetsUiState()
+            lastLoadAttemptAt = 0L
         }
         loadJob?.cancel()
-        _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+        lastLoadAttemptAt = SystemClock.elapsedRealtime()
+        val hasCachedHousehold = _uiState.value.hasHousehold
+        _uiState.value = _uiState.value.copy(isLoading = !hasCachedHousehold, errorMessage = null)
         loadJob = viewModelScope.launch {
             try {
                 val snapshot = householdMembersRepository.load(user)
@@ -110,11 +120,14 @@ class FinanceBudgetsViewModel(
                     errorMessage = null
                 )
                 startObserving(user, householdId, role)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
+                val canKeepCachedData = _uiState.value.hasHousehold
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    hasHousehold = false,
-                    errorMessage = userMessage(error)
+                    hasHousehold = canKeepCachedData,
+                    errorMessage = if (canKeepCachedData) null else userMessage(error)
                 )
             }
         }
@@ -157,6 +170,7 @@ class FinanceBudgetsViewModel(
         loadJob?.cancel()
         stopObserving()
         currentUser = null
+        lastLoadAttemptAt = 0L
         _uiState.value = FinanceBudgetsUiState(isLoading = false)
     }
 
@@ -278,6 +292,8 @@ class FinanceBudgetsViewModel(
         }
     }
 }
+
+private const val SCREEN_CACHE_TTL_MILLIS = 60_000L
 
 private fun currentMonthStart(): String = SimpleDateFormat(MONTH_START_PATTERN, Locale.ROOT)
     .format(Date())
