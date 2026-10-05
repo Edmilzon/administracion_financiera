@@ -1,6 +1,7 @@
 package com.moonspace.adminfinanciera.core.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
@@ -40,17 +41,24 @@ fun FinanceButton(
     variant: FinanceButtonVariant = FinanceButtonVariant.Primary,
     enabled: Boolean = true,
     isLoading: Boolean = false,
-    loadingLabel: String = label
+    loadingLabel: String = label,
+    compact: Boolean = false
 ) {
     val buttonModifier = modifier.heightIn(min = FinanceSpacing.ButtonHeight)
     val canClick = enabled && !isLoading
+    val contentPadding = if (compact) {
+        PaddingValues(horizontal = FinanceSpacing.Compact, vertical = 0.dp)
+    } else {
+        ButtonDefaults.ContentPadding
+    }
 
     when (variant) {
         FinanceButtonVariant.Primary -> Button(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = canClick,
-            shape = FinanceShapes.Control
+            shape = FinanceShapes.Control,
+            contentPadding = contentPadding
         ) {
             ButtonContent(label = label, loadingLabel = loadingLabel, isLoading = isLoading)
         }
@@ -59,7 +67,8 @@ fun FinanceButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = canClick,
-            shape = FinanceShapes.Control
+            shape = FinanceShapes.Control,
+            contentPadding = contentPadding
         ) {
             ButtonContent(label = label, loadingLabel = loadingLabel, isLoading = isLoading)
         }
@@ -68,7 +77,8 @@ fun FinanceButton(
             onClick = onClick,
             modifier = buttonModifier,
             enabled = canClick,
-            shape = FinanceShapes.Control
+            shape = FinanceShapes.Control,
+            contentPadding = contentPadding
         ) {
             ButtonContent(label = label, loadingLabel = loadingLabel, isLoading = isLoading)
         }
@@ -81,7 +91,8 @@ fun FinanceButton(
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.error,
                 contentColor = MaterialTheme.colorScheme.onError
-            )
+            ),
+            contentPadding = contentPadding
         ) {
             ButtonContent(label = label, loadingLabel = loadingLabel, isLoading = isLoading)
         }

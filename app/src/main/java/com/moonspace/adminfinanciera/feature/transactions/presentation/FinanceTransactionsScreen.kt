@@ -161,7 +161,8 @@ fun FinanceTransactionsScreen(
                                 isShowingCategoryManager = true
                             },
                             variant = FinanceButtonVariant.Secondary,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            compact = true
                         )
                     }
                 }

@@ -105,7 +105,7 @@
     <string name="transactions_member_breakdown">Totales por persona</string>
     <string name="transactions_list_title">Movimientos</string>
     <string name="transactions_register">Registrar movimiento</string>
-    <string name="transactions_manage_categories">Gestionar categorías</string>
+    <string name="transactions_manage_categories">Categorías</string>
     <string name="transactions_saved_locally">Guardado en este teléfono.</string>
     <string name="transactions_no_household_title">Todavía no tienes un espacio</string>
     <string name="transactions_no_household_description">Crea o configura tu espacio desde Usuarios antes de registrar movimientos.</string>
@@ -313,7 +313,7 @@
     <string name="reports_export_title">Exportar informe</string>
     <string name="reports_export_description">El PDF se puede imprimir. Guarda el archivo en tu teléfono o compártelo con otra aplicación.</string>
     <string name="reports_generate_pdf">Generar PDF</string>
-    <string name="reports_generate_excel">Generar Excel (.xlsx)</string>
+    <string name="reports_generate_excel">Generar Excel</string>
     <string name="reports_generating">Generando archivo…</string>
     <string name="reports_file_ready">Archivo listo: %1$s</string>
     <string name="reports_save_file">Guardar archivo</string>

@@ -1,7 +1,7 @@
 package com.moonspace.adminfinanciera.feature.reports.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,21 +19,23 @@ fun ReportPeriodSelector(
     onEndClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
+        horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
     ) {
         FinanceButton(
             label = stringResource(R.string.reports_from, startLabel),
             onClick = onStartClick,
-            modifier = Modifier.fillMaxWidth(),
-            variant = FinanceButtonVariant.Secondary
+            modifier = Modifier.weight(1f),
+            variant = FinanceButtonVariant.Secondary,
+            compact = true
         )
         FinanceButton(
             label = stringResource(R.string.reports_until, endLabel),
             onClick = onEndClick,
-            modifier = Modifier.fillMaxWidth(),
-            variant = FinanceButtonVariant.Secondary
+            modifier = Modifier.weight(1f),
+            variant = FinanceButtonVariant.Secondary,
+            compact = true
         )
     }
 }

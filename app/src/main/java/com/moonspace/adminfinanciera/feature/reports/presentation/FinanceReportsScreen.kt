@@ -256,7 +256,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.reportItems(
     onPrint: () -> Unit
 ) {
     item {
-        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
+        ReportExportActions(
+            isGenerating = state.isGenerating,
+            generatedFile = state.generatedFile,
+            onGeneratePdf = { onGenerate(ReportExportFormat.Pdf) },
+            onGenerateExcel = { onGenerate(ReportExportFormat.Excel) },
+            onSave = onSave,
+            onShare = onShare,
+            onPrint = onPrint
+        )
+    }
+    item {
+        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
             FinanceSectionHeader(
                 title = stringResource(R.string.reports_filters_title),
                 supportingText = stringResource(R.string.reports_scope, report.scopeLabel)
@@ -355,17 +366,6 @@ private fun androidx.compose.foundation.lazy.LazyListScope.reportItems(
         }
     } else {
         items(report.rows, key = { it.id }) { row -> ReportMovementCard(row) }
-    }
-    item {
-        ReportExportActions(
-            isGenerating = state.isGenerating,
-            generatedFile = state.generatedFile,
-            onGeneratePdf = { onGenerate(ReportExportFormat.Pdf) },
-            onGenerateExcel = { onGenerate(ReportExportFormat.Excel) },
-            onSave = onSave,
-            onShare = onShare,
-            onPrint = onPrint
-        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.moonspace.adminfinanciera.feature.reports.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -46,40 +47,48 @@ fun ReportExportActions(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (generatedFile == null) {
-                FinanceButton(
-                    label = stringResource(R.string.reports_generate_pdf),
-                    onClick = onGeneratePdf,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGenerating,
-                    isLoading = isGenerating,
-                    loadingLabel = stringResource(R.string.reports_generating),
-                    variant = FinanceButtonVariant.Primary
-                )
-                FinanceButton(
-                    label = stringResource(R.string.reports_generate_excel),
-                    onClick = onGenerateExcel,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isGenerating,
-                    variant = FinanceButtonVariant.Secondary
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
+                    FinanceButton(
+                        label = stringResource(R.string.reports_generate_pdf),
+                        onClick = onGeneratePdf,
+                        modifier = Modifier.weight(1f),
+                        enabled = !isGenerating,
+                        isLoading = isGenerating,
+                        loadingLabel = stringResource(R.string.reports_generating),
+                        variant = FinanceButtonVariant.Primary,
+                        compact = true
+                    )
+                    FinanceButton(
+                        label = stringResource(R.string.reports_generate_excel),
+                        onClick = onGenerateExcel,
+                        modifier = Modifier.weight(1f),
+                        enabled = !isGenerating,
+                        variant = FinanceButtonVariant.Secondary,
+                        compact = true
+                    )
+                }
             } else {
                 Text(
                     text = stringResource(R.string.reports_file_ready, generatedFile.fileName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                FinanceButton(
-                    label = stringResource(R.string.reports_save_file),
-                    onClick = onSave,
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = FinanceButtonVariant.Primary
-                )
-                FinanceButton(
-                    label = stringResource(R.string.reports_share_file),
-                    onClick = onShare,
-                    modifier = Modifier.fillMaxWidth(),
-                    variant = FinanceButtonVariant.Secondary
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
+                    FinanceButton(
+                        label = stringResource(R.string.reports_save_file),
+                        onClick = onSave,
+                        modifier = Modifier.weight(1f),
+                        variant = FinanceButtonVariant.Primary,
+                        compact = true
+                    )
+                    FinanceButton(
+                        label = stringResource(R.string.reports_share_file),
+                        onClick = onShare,
+                        modifier = Modifier.weight(1f),
+                        variant = FinanceButtonVariant.Secondary,
+                        compact = true
+                    )
+                }
                 if (generatedFile.format == ReportExportFormat.Pdf) {
                     FinanceButton(
                         label = stringResource(R.string.reports_print_file),

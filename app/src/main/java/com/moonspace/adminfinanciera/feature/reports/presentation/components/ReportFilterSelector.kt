@@ -40,7 +40,8 @@ fun ReportFilterSelector(
                 label = selectedLabel,
                 onClick = { isExpanded = true },
                 modifier = Modifier.fillMaxWidth(),
-                variant = FinanceButtonVariant.Secondary
+                variant = FinanceButtonVariant.Secondary,
+                compact = true
             )
             DropdownMenu(
                 expanded = isExpanded,
