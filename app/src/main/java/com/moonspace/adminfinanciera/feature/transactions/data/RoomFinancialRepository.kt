@@ -113,6 +113,7 @@ class RoomFinancialRepository(
                 categoryDao.insertDefaults(defaults)
             }
         }
+        // Enqueue the first pull only after the account's household cache is ready for the worker.
         syncScheduler.scheduleNow(accountId)
     }
 

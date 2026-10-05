@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class FinanceSyncScheduler(context: Context) {
     private val workManager = WorkManager.getInstance(context.applicationContext)
 
-    fun scheduleForSignedInAccount(accountId: String) {
+    fun schedulePeriodicForSignedInAccount(accountId: String) {
         require(accountId.isNotBlank())
         workManager.enqueueUniquePeriodicWork(
             periodicWorkName(accountId),
@@ -28,7 +28,6 @@ class FinanceSyncScheduler(context: Context) {
                 .addTag(FinanceSyncWorker.TAG)
                 .build()
         )
-        scheduleNow(accountId)
     }
 
     fun scheduleNow(accountId: String) {

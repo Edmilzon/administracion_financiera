@@ -76,7 +76,7 @@ fun FinanceNavigation() {
     } else if (uiState.user != null) {
         val user = requireNotNull(uiState.user)
         LaunchedEffect(user.id) {
-            container.syncScheduler.scheduleForSignedInAccount(user.id)
+            container.syncScheduler.schedulePeriodicForSignedInAccount(user.id)
             container.recurringReminderScheduler.scheduleDaily(user.id)
         }
         val membersViewModel: HouseholdMembersViewModel = viewModel(
