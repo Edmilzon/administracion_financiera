@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">Finanzas en pareja</string>
-    <string name="login_eyebrow">FINANZAS EN PAREJA</string>
+    <string name="app_name">Nexo Finanzas</string>
+    <string name="login_eyebrow">NEXO FINANZAS</string>
     <string name="login_title">Tus finanzas, en orden</string>
-    <string name="login_description">Inicia sesión con tu cuenta de Finanzas en pareja.</string>
+    <string name="login_description">Inicia sesión en tu espacio financiero compartido.</string>
     <string name="auth_create_title">Crea tu cuenta</string>
     <string name="auth_create_description">Registra tu correo para acceder a tu espacio financiero.</string>
     <string name="auth_config_missing">Configura las URLs HTTPS de Neon Auth y Data API en local.properties para habilitar el acceso remoto.</string>
