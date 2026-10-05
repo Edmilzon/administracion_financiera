@@ -74,7 +74,7 @@ CREATE POLICY budgets_own_delete ON public.budgets
         AND public.is_household_member(household_id)
     );
 
-REVOKE ALL ON TABLE public.budgets FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.budgets FROM PUBLIC, anonymous, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.budgets TO authenticated;
 
 COMMIT;

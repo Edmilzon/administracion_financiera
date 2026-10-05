@@ -227,8 +227,8 @@ CREATE POLICY transactions_own_delete ON public.transactions
         AND public.is_household_member(household_id)
     );
 
-REVOKE ALL ON TABLE public.categories FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE public.transactions FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.categories FROM PUBLIC, anonymous, authenticated;
+REVOKE ALL ON TABLE public.transactions FROM PUBLIC, anonymous, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.categories TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.transactions TO authenticated;
 

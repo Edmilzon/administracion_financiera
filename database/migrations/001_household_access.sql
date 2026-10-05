@@ -240,8 +240,8 @@ CREATE POLICY household_members_self_or_admin_read ON public.household_members
     FOR SELECT TO authenticated
     USING (user_id = auth.user_id() OR public.is_household_admin(household_id));
 
-REVOKE ALL ON TABLE public.households FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON TABLE public.household_members FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.households FROM PUBLIC, anonymous, authenticated;
+REVOKE ALL ON TABLE public.household_members FROM PUBLIC, anonymous, authenticated;
 GRANT SELECT ON TABLE public.households, public.household_members TO authenticated;
 
 REVOKE ALL ON FUNCTION public.is_household_member(uuid) FROM PUBLIC;

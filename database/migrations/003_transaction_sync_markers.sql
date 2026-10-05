@@ -69,7 +69,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON TABLE public.transaction_deletion_markers FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.transaction_deletion_markers FROM PUBLIC, anonymous, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.transaction_deletion_markers TO authenticated;
 REVOKE ALL ON FUNCTION public.prune_expired_transaction_deletion_markers(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.prune_expired_transaction_deletion_markers(uuid) TO authenticated;

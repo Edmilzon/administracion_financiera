@@ -132,7 +132,7 @@ CREATE POLICY recurring_rules_own_update ON public.recurring_rules
         AND public.is_household_member(household_id)
     );
 
-REVOKE ALL ON TABLE public.recurring_rules FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.recurring_rules FROM PUBLIC, anonymous, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.recurring_rules TO authenticated;
 REVOKE ALL ON FUNCTION public.enforce_transaction_recurring_rule_owner() FROM PUBLIC;
 
