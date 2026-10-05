@@ -12,6 +12,8 @@ Las migraciones versionadas de la base se mantienen en `database/migrations/`. N
 
 La eliminación de un integrante quita su pertenencia al espacio; no borra su identidad de Neon Auth. Las políticas de las tablas financieras futuras deberán comprobar que el usuario sigue perteneciendo al espacio.
 
-## Segunda migración: categorías y movimientos
+## Migraciones financieras
 
-Después de `001_household_access.sql`, ejecutar `migrations/002_financial_records.sql`. Crea las categorías iniciales y las tablas de movimientos, y aplica RLS para que solo administradores gestionen categorías, administradores lean los movimientos del espacio y cada integrante inserte/edite/elimine solo los propios. Esta migración está versionada, pero aún no se ha ejecutado porque la rama Neon y sus endpoints siguen pendientes de configuración.
+Las migraciones `002_financial_records.sql` a `005_recurring_rules.sql` crean movimientos/categorías, marcadores de borrado, presupuestos y reglas recurrentes. En el proyecto actual, las migraciones `001`–`005` ya se aplicaron a `production`; falta probar el comportamiento con sesiones reales.
+
+`006_debts.sql` crea **debts** y **debt_payments**, aplica RLS y valida en PostgreSQL que los abonos acumulados no superen el monto inicial. La APK calcula el saldo pendiente como monto inicial menos abonos, sin intereses ni creación de movimientos automáticos. Ejecuta la migración `006` en el SQL Editor de la misma rama Neon y refresca la caché de esquema de Data API antes de instalar una APK que incluya esta sincronización. La migración no incluye credenciales.

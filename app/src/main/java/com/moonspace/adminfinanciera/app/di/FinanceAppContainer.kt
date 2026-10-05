@@ -19,6 +19,8 @@ import com.moonspace.adminfinanciera.feature.budgets.domain.BudgetRepository
 import com.moonspace.adminfinanciera.feature.recurring.data.RoomRecurringRuleRepository
 import com.moonspace.adminfinanciera.feature.recurring.domain.RecurringRuleRepository
 import com.moonspace.adminfinanciera.feature.reports.data.FinanceReportDocumentGenerator
+import com.moonspace.adminfinanciera.feature.debts.data.RoomDebtRepository
+import com.moonspace.adminfinanciera.feature.debts.domain.DebtRepository
 
 class FinanceAppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -47,6 +49,7 @@ class FinanceAppContainer(context: Context) {
         syncScheduler,
         recurringReminderScheduler
     )
+    val debtRepository: DebtRepository = RoomDebtRepository(financeDatabases, syncScheduler)
     val financeSyncRepository = NeonFinanceSyncRepository(
         config = neonApiConfig,
         dataApiClient = dataApiClient,

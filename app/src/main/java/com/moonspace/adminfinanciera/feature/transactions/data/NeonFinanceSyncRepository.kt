@@ -3,6 +3,8 @@ package com.moonspace.adminfinanciera.feature.transactions.data
 import androidx.room.withTransaction
 import com.moonspace.adminfinanciera.core.database.BudgetEntity
 import com.moonspace.adminfinanciera.core.database.CategoryEntity
+import com.moonspace.adminfinanciera.core.database.DebtEntity
+import com.moonspace.adminfinanciera.core.database.DebtPaymentEntity
 import com.moonspace.adminfinanciera.core.database.EncryptedFinanceDatabaseProvider
 import com.moonspace.adminfinanciera.core.database.FinanceDatabase
 import com.moonspace.adminfinanciera.core.database.RecurringRuleEntity
@@ -96,6 +98,22 @@ class NeonFinanceSyncRepository(
                 if (role == ROLE_MEMBER) put("created_by", "eq.$accountId")
             }
         ).map { it.toRecurringRule(accountId) }
+        val remoteDebts = requestRows(
+            resource = DEBTS_RESOURCE,
+            query = buildMap {
+                put("select", DEBT_COLUMNS)
+                put("household_id", "eq.$householdId")
+                if (role == ROLE_MEMBER) put("created_by", "eq.$accountId")
+            }
+        ).map { it.toDebt(accountId) }
+        val remoteDebtPayments = requestRows(
+            resource = DEBT_PAYMENTS_RESOURCE,
+            query = buildMap {
+                put("select", DEBT_PAYMENT_COLUMNS)
+                put("household_id", "eq.$householdId")
+                if (role == ROLE_MEMBER) put("created_by", "eq.$accountId")
+            }
+        ).map { it.toDebtPayment(accountId) }
         val remoteMarkers = requestRows(
             resource = DELETION_MARKERS_RESOURCE,
             query = mapOf(
@@ -122,6 +140,8 @@ class NeonFinanceSyncRepository(
             categories = remoteCategories,
             budgets = remoteBudgets,
             recurringRules = remoteRecurringRules,
+            debts = remoteDebts,
+            debtPayments = remoteDebtPayments,
             transactions = remoteTransactions,
             deletedTransactionIds = remoteMarkers.mapNotNull { it.optString("transaction_id").takeIf(String::isNotBlank) }.toSet(),
             previousSuccessfulSyncAt = lastSyncAt,
@@ -134,7 +154,9 @@ class NeonFinanceSyncRepository(
             householdId = householdId,
             remoteCategoryIds = remoteCategories.mapTo(mutableSetOf(), CategoryEntity::id),
             remoteBudgetIds = remoteBudgets.mapTo(mutableSetOf(), BudgetEntity::id),
-            remoteRecurringRuleIds = remoteRecurringRules.mapTo(mutableSetOf(), RecurringRuleEntity::id)
+            remoteRecurringRuleIds = remoteRecurringRules.mapTo(mutableSetOf(), RecurringRuleEntity::id),
+            remoteDebtIds = remoteDebts.mapTo(mutableSetOf(), DebtEntity::id),
+            remoteDebtPaymentIds = remoteDebtPayments.mapTo(mutableSetOf(), DebtPaymentEntity::id)
         )
         database.syncStateDao().save(
             SyncStateEntity(
@@ -153,6 +175,8 @@ class NeonFinanceSyncRepository(
         categories: List<CategoryEntity>,
         budgets: List<BudgetEntity>,
         recurringRules: List<RecurringRuleEntity>,
+        debts: List<DebtEntity>,
+        debtPayments: List<DebtPaymentEntity>,
         transactions: List<TransactionEntity>,
         deletedTransactionIds: Set<String>,
         previousSuccessfulSyncAt: Long?,
@@ -162,12 +186,16 @@ class NeonFinanceSyncRepository(
         val categoryDao = database.categoryDao()
         val budgetDao = database.budgetDao()
         val recurringRuleDao = database.recurringRuleDao()
+        val debtDao = database.debtDao()
+        val debtPaymentDao = database.debtPaymentDao()
         val transactionDao = database.transactionDao()
         val outboxDao = database.syncOutboxDao()
         val deletionMarkerDao = database.transactionDeletionMarkerDao()
         val remoteCategoryById = categories.associateBy(CategoryEntity::id)
         val remoteBudgetById = budgets.associateBy(BudgetEntity::id)
         val remoteRecurringRuleById = recurringRules.associateBy(RecurringRuleEntity::id)
+        val remoteDebtById = debts.associateBy(DebtEntity::id)
+        val remoteDebtPaymentById = debtPayments.associateBy(DebtPaymentEntity::id)
         val remoteTransactionById = transactions.associateBy(TransactionEntity::id)
 
         database.withTransaction {
@@ -181,10 +209,14 @@ class NeonFinanceSyncRepository(
                 transactionDao.removeOthers(householdId, accountId)
                 recurringRuleDao.removeOthers(householdId, accountId)
                 budgetDao.removeOthers(householdId, accountId)
+                debtDao.removeOthers(householdId, accountId)
+                debtPaymentDao.removeOthers(householdId, accountId)
             }
 
             val localBudgetsBeforeImport = budgetDao.allForHousehold(householdId)
             val localRecurringRulesBeforeImport = recurringRuleDao.allForHousehold(householdId)
+            val localDebtsBeforeImport = debtDao.allForHousehold(householdId)
+            val localDebtPaymentsBeforeImport = debtPaymentDao.allForHousehold(householdId)
             val localTransactionsBeforeImport = transactionDao.allForHousehold(householdId)
             val queuedBeforeImport = outboxDao.pending(accountId).associateBy { it.entityType to it.entityId }
 
@@ -213,6 +245,64 @@ class NeonFinanceSyncRepository(
             recurringRules.forEach { remoteRule ->
                 if (queuedBeforeImport[ENTITY_RECURRING_RULE to remoteRule.id] == null) {
                     recurringRuleDao.save(remoteRule)
+                }
+            }
+
+            debts.forEach { remoteDebt ->
+                if (queuedBeforeImport[ENTITY_DEBT to remoteDebt.id] == null) {
+                    debtDao.save(remoteDebt)
+                }
+            }
+
+            debtPayments.forEach { remotePayment ->
+                val parentOperation = queuedBeforeImport[ENTITY_DEBT to remotePayment.debtId]
+                if (parentOperation?.operation == OPERATION_DELETE ||
+                    debtDao.findById(householdId, remotePayment.debtId) == null
+                ) {
+                    return@forEach
+                }
+                if (queuedBeforeImport[ENTITY_DEBT_PAYMENT to remotePayment.id] == null) {
+                    debtPaymentDao.save(remotePayment)
+                }
+            }
+
+            localDebtsBeforeImport.forEach { localDebt ->
+                if (localDebt.id in remoteDebtById) return@forEach
+                val pending = queuedBeforeImport[ENTITY_DEBT to localDebt.id]
+                if (pending == null) {
+                    localDebtPaymentsBeforeImport.filter { it.debtId == localDebt.id }.forEach { payment ->
+                        outboxDao.removeForEntity(accountId, ENTITY_DEBT_PAYMENT, payment.id)
+                    }
+                    debtDao.deleteById(householdId, localDebt.id)
+                    return@forEach
+                }
+                val wasBasedOnPreviousSnapshot = previousSuccessfulSyncAt != null &&
+                    localDebt.updatedAt <= previousSuccessfulSyncAt
+                if (localDebt.isRemoteBacked && wasBasedOnPreviousSnapshot &&
+                    pending.operation == OPERATION_UPSERT
+                ) {
+                    localDebtPaymentsBeforeImport.filter { it.debtId == localDebt.id }.forEach { payment ->
+                        outboxDao.removeForEntity(accountId, ENTITY_DEBT_PAYMENT, payment.id)
+                    }
+                    debtDao.deleteById(householdId, localDebt.id)
+                    outboxDao.removeForEntity(accountId, ENTITY_DEBT, localDebt.id)
+                }
+            }
+
+            localDebtPaymentsBeforeImport.forEach { localPayment ->
+                if (localPayment.id in remoteDebtPaymentById) return@forEach
+                val pending = queuedBeforeImport[ENTITY_DEBT_PAYMENT to localPayment.id]
+                if (pending == null) {
+                    debtPaymentDao.deleteById(householdId, localPayment.id)
+                    return@forEach
+                }
+                val wasBasedOnPreviousSnapshot = previousSuccessfulSyncAt != null &&
+                    localPayment.updatedAt <= previousSuccessfulSyncAt
+                if (localPayment.isRemoteBacked && wasBasedOnPreviousSnapshot &&
+                    pending.operation == OPERATION_UPSERT
+                ) {
+                    debtPaymentDao.deleteById(householdId, localPayment.id)
+                    outboxDao.removeForEntity(accountId, ENTITY_DEBT_PAYMENT, localPayment.id)
                 }
             }
 
@@ -296,7 +386,9 @@ class NeonFinanceSyncRepository(
         householdId: String,
         remoteCategoryIds: MutableSet<String>,
         remoteBudgetIds: MutableSet<String>,
-        remoteRecurringRuleIds: MutableSet<String>
+        remoteRecurringRuleIds: MutableSet<String>,
+        remoteDebtIds: MutableSet<String>,
+        remoteDebtPaymentIds: MutableSet<String>
     ) {
         val outboxDao = database.syncOutboxDao()
         var sentCount = 0
@@ -308,7 +400,10 @@ class NeonFinanceSyncRepository(
                             ENTITY_CATEGORY -> 0
                             ENTITY_RECURRING_RULE -> 1
                             ENTITY_BUDGET -> 2
-                            else -> 3
+                            ENTITY_DEBT -> 3
+                            ENTITY_DEBT_PAYMENT -> 4
+                            ENTITY_TRANSACTION -> 5
+                            else -> 6
                         }
                     }.thenBy(SyncOutboxEntity::enqueuedAt)
                 )
@@ -330,6 +425,12 @@ class NeonFinanceSyncRepository(
                         remoteRecurringRuleIds
                     )
                     ENTITY_TRANSACTION -> sendTransactionOperation(database, accountId, householdId, operation)
+                    ENTITY_DEBT -> sendDebtOperation(
+                        database, accountId, householdId, operation, remoteDebtIds
+                    )
+                    ENTITY_DEBT_PAYMENT -> sendDebtPaymentOperation(
+                        database, accountId, householdId, operation, remoteDebtPaymentIds
+                    )
                     else -> throw IOException("Unsupported queued finance entity type.")
                 }
                 sentCount += 1
@@ -463,6 +564,111 @@ class NeonFinanceSyncRepository(
         remoteRuleIds += rule.id
         database.withTransaction {
             ruleDao.markRemoteBacked(householdId, rule.id)
+            database.syncOutboxDao().removeById(operation.id)
+        }
+    }
+
+    private suspend fun sendDebtOperation(
+        database: FinanceDatabase,
+        accountId: String,
+        householdId: String,
+        operation: SyncOutboxEntity,
+        remoteDebtIds: MutableSet<String>
+    ) {
+        if (operation.operation == OPERATION_DELETE) {
+            request(
+                resource = DEBTS_RESOURCE,
+                method = NeonDataApiMethod.DELETE,
+                query = mapOf(
+                    "id" to "eq.${operation.entityId}",
+                    "household_id" to "eq.$householdId",
+                    "created_by" to "eq.$accountId"
+                )
+            )
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        if (operation.operation != OPERATION_UPSERT) {
+            throw IOException("Unsupported debt operation in the finance sync queue.")
+        }
+
+        val debt = database.debtDao().findById(householdId, operation.entityId)
+        if (debt == null || debt.createdBy != accountId) {
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        val alreadyRemote = debt.id in remoteDebtIds
+        request(
+            resource = DEBTS_RESOURCE,
+            method = if (alreadyRemote) NeonDataApiMethod.PATCH else NeonDataApiMethod.POST,
+            query = if (alreadyRemote) {
+                mapOf(
+                    "id" to "eq.${debt.id}",
+                    "household_id" to "eq.$householdId",
+                    "created_by" to "eq.$accountId"
+                )
+            } else {
+                mapOf("on_conflict" to "id")
+            },
+            body = debt.toJson(),
+            prefer = if (alreadyRemote) null else UPSERT_PREFER
+        )
+        remoteDebtIds += debt.id
+        database.withTransaction {
+            database.debtDao().markRemoteBacked(householdId, debt.id)
+            database.syncOutboxDao().removeById(operation.id)
+        }
+    }
+
+    private suspend fun sendDebtPaymentOperation(
+        database: FinanceDatabase,
+        accountId: String,
+        householdId: String,
+        operation: SyncOutboxEntity,
+        remotePaymentIds: MutableSet<String>
+    ) {
+        if (operation.operation == OPERATION_DELETE) {
+            request(
+                resource = DEBT_PAYMENTS_RESOURCE,
+                method = NeonDataApiMethod.DELETE,
+                query = mapOf(
+                    "id" to "eq.${operation.entityId}",
+                    "household_id" to "eq.$householdId",
+                    "created_by" to "eq.$accountId"
+                )
+            )
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        if (operation.operation != OPERATION_UPSERT) {
+            throw IOException("Unsupported debt payment operation in the finance sync queue.")
+        }
+
+        val payment = database.debtPaymentDao().findById(householdId, operation.entityId)
+        val debt = payment?.let { database.debtDao().findById(householdId, it.debtId) }
+        if (payment == null || payment.createdBy != accountId || debt?.createdBy != accountId) {
+            database.syncOutboxDao().removeById(operation.id)
+            return
+        }
+        val alreadyRemote = payment.id in remotePaymentIds
+        request(
+            resource = DEBT_PAYMENTS_RESOURCE,
+            method = if (alreadyRemote) NeonDataApiMethod.PATCH else NeonDataApiMethod.POST,
+            query = if (alreadyRemote) {
+                mapOf(
+                    "id" to "eq.${payment.id}",
+                    "household_id" to "eq.$householdId",
+                    "created_by" to "eq.$accountId"
+                )
+            } else {
+                mapOf("on_conflict" to "id")
+            },
+            body = payment.toJson(),
+            prefer = if (alreadyRemote) null else UPSERT_PREFER
+        )
+        remotePaymentIds += payment.id
+        database.withTransaction {
+            database.debtPaymentDao().markRemoteBacked(householdId, payment.id)
             database.syncOutboxDao().removeById(operation.id)
         }
     }
@@ -617,6 +823,43 @@ class NeonFinanceSyncRepository(
         isRemoteBacked = true
     )
 
+    private fun JSONObject.toDebt(accountId: String): DebtEntity {
+        val direction = getString("direction")
+        if (direction != "owed_by_me" && direction != "owed_to_me") {
+            throw IOException("Neon Data API returned an invalid debt direction.")
+        }
+        return DebtEntity(
+            id = getString("id"),
+            accountId = accountId,
+            householdId = getString("household_id"),
+            createdBy = getString("created_by"),
+            direction = direction,
+            counterparty = getString("counterparty"),
+            description = optNullableString("description"),
+            principalCentavos = getBigDecimal("principal_amount").movePointRight(2).longValueExact(),
+            currency = getString("currency").trim(),
+            openedOn = getString("opened_on"),
+            dueOn = optNullableString("due_on"),
+            createdAt = getInstantMillis("created_at"),
+            updatedAt = getInstantMillis("updated_at"),
+            isRemoteBacked = true
+        )
+    }
+
+    private fun JSONObject.toDebtPayment(accountId: String): DebtPaymentEntity = DebtPaymentEntity(
+        id = getString("id"),
+        accountId = accountId,
+        householdId = getString("household_id"),
+        debtId = getString("debt_id"),
+        createdBy = getString("created_by"),
+        amountCentavos = getBigDecimal("amount").movePointRight(2).longValueExact(),
+        paidOn = getString("paid_on"),
+        note = optNullableString("note"),
+        createdAt = getInstantMillis("created_at"),
+        updatedAt = getInstantMillis("updated_at"),
+        isRemoteBacked = true
+    )
+
     private fun JSONObject.toTransaction(accountId: String): TransactionEntity = TransactionEntity(
         id = getString("id"),
         accountId = accountId,
@@ -717,6 +960,31 @@ class NeonFinanceSyncRepository(
         .put("next_due_on", nextDueOn)
         .put("is_active", isActive)
 
+    private fun DebtEntity.toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("household_id", householdId)
+        .put("created_by", createdBy)
+        .put("direction", direction)
+        .put("counterparty", counterparty)
+        .put("description", description ?: JSONObject.NULL)
+        .put("principal_amount", BigDecimal.valueOf(principalCentavos, 2).toPlainString())
+        .put("currency", currency)
+        .put("opened_on", openedOn)
+        .put("due_on", dueOn ?: JSONObject.NULL)
+        .put("created_at", formatTimestamp(createdAt))
+        .put("updated_at", formatTimestamp(updatedAt))
+
+    private fun DebtPaymentEntity.toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("household_id", householdId)
+        .put("debt_id", debtId)
+        .put("created_by", createdBy)
+        .put("amount", BigDecimal.valueOf(amountCentavos, 2).toPlainString())
+        .put("paid_on", paidOn)
+        .put("note", note ?: JSONObject.NULL)
+        .put("created_at", formatTimestamp(createdAt))
+        .put("updated_at", formatTimestamp(updatedAt))
+
     private fun formatTimestamp(timestampMillis: Long): String = timestampFormatter().format(Date(timestampMillis))
 
     private fun timestampParser() = SimpleDateFormat(TIMESTAMP_PATTERN_FORMAT, Locale.ROOT).apply {
@@ -733,6 +1001,8 @@ class NeonFinanceSyncRepository(
         private const val CATEGORIES_RESOURCE = "categories"
         private const val BUDGETS_RESOURCE = "budgets"
         private const val RECURRING_RULES_RESOURCE = "recurring_rules"
+        private const val DEBTS_RESOURCE = "debts"
+        private const val DEBT_PAYMENTS_RESOURCE = "debt_payments"
         private const val TRANSACTIONS_RESOURCE = "transactions"
         private const val DELETION_MARKERS_RESOURCE = "transaction_deletion_markers"
         private const val RPC_RESOURCE = "rpc"
@@ -740,11 +1010,15 @@ class NeonFinanceSyncRepository(
         private const val CATEGORY_COLUMNS = "id,household_id,created_by,name,kind,is_active,created_at,updated_at"
         private const val BUDGET_COLUMNS = "id,household_id,user_id,category_id,month_start,amount_limit::text,created_at,updated_at"
         private const val RECURRING_RULE_COLUMNS = "id,household_id,created_by,category_id,kind,amount::text,currency,description,frequency,interval_count,start_on,next_due_on,is_active,created_at,updated_at"
+        private const val DEBT_COLUMNS = "id,household_id,created_by,direction,counterparty,description,principal_amount::text,currency,opened_on,due_on,created_at,updated_at"
+        private const val DEBT_PAYMENT_COLUMNS = "id,household_id,debt_id,created_by,amount::text,paid_on,note,created_at,updated_at"
         private const val TRANSACTION_COLUMNS = "id,household_id,created_by,category_id,source_recurring_rule_id,scheduled_for,kind,amount::text,currency,occurred_on,description,created_at,updated_at"
         private const val DELETION_MARKER_COLUMNS = "transaction_id,household_id,created_by,deleted_at"
         private const val ENTITY_CATEGORY = "category"
         private const val ENTITY_BUDGET = "budget"
         private const val ENTITY_RECURRING_RULE = "recurring_rule"
+        private const val ENTITY_DEBT = "debt"
+        private const val ENTITY_DEBT_PAYMENT = "debt_payment"
         private const val ENTITY_TRANSACTION = "transaction"
         private const val OPERATION_UPSERT = "upsert"
         private const val OPERATION_DELETE = "delete"

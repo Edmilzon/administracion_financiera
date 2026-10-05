@@ -499,11 +499,13 @@ interface BudgetDao {
         TransactionEntity::class,
         RecurringRuleEntity::class,
         BudgetEntity::class,
+        DebtEntity::class,
+        DebtPaymentEntity::class,
         SyncOutboxEntity::class,
         TransactionDeletionMarkerEntity::class,
         SyncStateEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -513,6 +515,8 @@ abstract class FinanceDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun recurringRuleDao(): RecurringRuleDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun debtDao(): DebtDao
+    abstract fun debtPaymentDao(): DebtPaymentDao
     abstract fun syncOutboxDao(): SyncOutboxDao
     abstract fun transactionDeletionMarkerDao(): TransactionDeletionMarkerDao
 
@@ -599,6 +603,41 @@ abstract class FinanceDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_recurring_rules_household_id_created_by_next_due_on` " +
                         "ON `recurring_rules` (`household_id`, `created_by`, `next_due_on`)"
                 )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `debts` (" +
+                        "`id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `household_id` TEXT NOT NULL, " +
+                        "`created_by` TEXT NOT NULL, `direction` TEXT NOT NULL, `counterparty` TEXT NOT NULL, " +
+                        "`description` TEXT, `principal_centavos` INTEGER NOT NULL, `currency` TEXT NOT NULL, " +
+                        "`opened_on` TEXT NOT NULL, `due_on` TEXT, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `is_remote_backed` INTEGER NOT NULL DEFAULT 0, " +
+                        "PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`account_id`) REFERENCES `household_cache`(`account_id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debts_account_id` ON `debts` (`account_id`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_debts_household_id_id` ON `debts` (`household_id`, `id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debts_household_id_created_by_direction` ON `debts` (`household_id`, `created_by`, `direction`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debts_household_id_due_on` ON `debts` (`household_id`, `due_on`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `debt_payments` (" +
+                        "`id` TEXT NOT NULL, `account_id` TEXT NOT NULL, `household_id` TEXT NOT NULL, " +
+                        "`debt_id` TEXT NOT NULL, `created_by` TEXT NOT NULL, `amount_centavos` INTEGER NOT NULL, " +
+                        "`paid_on` TEXT NOT NULL, `note` TEXT, `created_at` INTEGER NOT NULL, " +
+                        "`updated_at` INTEGER NOT NULL, `is_remote_backed` INTEGER NOT NULL DEFAULT 0, " +
+                        "PRIMARY KEY(`id`), " +
+                        "FOREIGN KEY(`account_id`) REFERENCES `household_cache`(`account_id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                        "FOREIGN KEY(`household_id`, `debt_id`) REFERENCES `debts`(`household_id`, `id`) " +
+                        "ON UPDATE NO ACTION ON DELETE CASCADE)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debt_payments_account_id` ON `debt_payments` (`account_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debt_payments_household_id_debt_id_paid_on` ON `debt_payments` (`household_id`, `debt_id`, `paid_on`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_debt_payments_household_id_created_by` ON `debt_payments` (`household_id`, `created_by`)")
             }
         }
     }

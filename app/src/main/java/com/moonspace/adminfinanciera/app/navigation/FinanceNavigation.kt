@@ -50,6 +50,8 @@ import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecur
 import com.moonspace.adminfinanciera.feature.recurring.presentation.FinanceRecurringViewModel
 import com.moonspace.adminfinanciera.feature.reports.presentation.FinanceReportsScreen
 import com.moonspace.adminfinanciera.feature.reports.presentation.FinanceReportsViewModel
+import com.moonspace.adminfinanciera.feature.debts.presentation.FinanceDebtsScreen
+import com.moonspace.adminfinanciera.feature.debts.presentation.FinanceDebtsViewModel
 
 @Composable
 fun FinanceNavigation() {
@@ -126,6 +128,17 @@ fun FinanceNavigation() {
             }
         )
         val reportsState by reportsViewModel.uiState.collectAsStateWithLifecycle()
+        val debtsViewModel: FinanceDebtsViewModel = viewModel(
+            factory = remember(container) {
+                FinanceDebtsViewModel.Factory(
+                    context,
+                    container.householdMembersRepository,
+                    container.financialRepository,
+                    container.debtRepository
+                )
+            }
+        )
+        val debtsState by debtsViewModel.uiState.collectAsStateWithLifecycle()
         var destination by rememberSaveable(user.id) {
             mutableStateOf(
                 if (activity?.intent?.getBooleanExtra(com.moonspace.adminfinanciera.app.MainActivity.EXTRA_OPEN_RECURRING, false) == true) {
@@ -165,6 +178,7 @@ fun FinanceNavigation() {
                         }
                     }
                 }
+                DESTINATION_DEBTS -> debtsViewModel.load(user)
             }
         }
 
@@ -176,6 +190,7 @@ fun FinanceNavigation() {
                     R.drawable.ic_nav_transactions
                 ),
                 FinanceNavigationDestination(DESTINATION_BUDGETS, R.string.nav_budgets, R.drawable.ic_nav_budgets),
+                FinanceNavigationDestination(DESTINATION_DEBTS, R.string.nav_debts, R.drawable.ic_nav_debts),
                 FinanceNavigationDestination(
                     DESTINATION_RECURRING,
                     R.string.nav_recurring,
@@ -224,6 +239,7 @@ fun FinanceNavigation() {
                             transactionsViewModel.clearAccountContext()
                             budgetsViewModel.clearAccountContext()
                             recurringViewModel.clearAccountContext()
+                            debtsViewModel.clearAccountContext()
                             reportsViewModel.clearAccountContext()
                             container.syncScheduler.cancelAccount(user.id)
                             container.recurringReminderScheduler.cancelAccount(user.id)
@@ -275,6 +291,18 @@ fun FinanceNavigation() {
                         onConfirmOccurrence = recurringViewModel::confirmOccurrence,
                         onClearMessages = recurringViewModel::clearMessages
                     )
+                } else if (activeDestination == DESTINATION_DEBTS) {
+                    FinanceDebtsScreen(
+                        user = user,
+                        state = debtsState,
+                        onOpenUsers = { destination = DESTINATION_USERS },
+                        onRefresh = { debtsViewModel.load(user, forceRefresh = true) },
+                        onSaveDebt = debtsViewModel::saveDebt,
+                        onDeleteDebt = debtsViewModel::deleteDebt,
+                        onSavePayment = debtsViewModel::savePayment,
+                        onDeletePayment = debtsViewModel::deletePayment,
+                        onClearMessages = debtsViewModel::clearMessages
+                    )
                 } else if (activeDestination == DESTINATION_REPORTS) {
                     FinanceReportsScreen(
                         state = reportsState,
@@ -306,12 +334,14 @@ fun FinanceNavigation() {
 private const val DESTINATION_USERS = "users"
 private const val DESTINATION_TRANSACTIONS = "transactions"
 private const val DESTINATION_BUDGETS = "budgets"
+private const val DESTINATION_DEBTS = "debts"
 private const val DESTINATION_RECURRING = "recurring"
 private const val DESTINATION_REPORTS = "reports"
 private val AUTHENTICATED_DESTINATIONS = setOf(
     DESTINATION_USERS,
     DESTINATION_TRANSACTIONS,
     DESTINATION_BUDGETS,
+    DESTINATION_DEBTS,
     DESTINATION_RECURRING,
     DESTINATION_REPORTS
 )
