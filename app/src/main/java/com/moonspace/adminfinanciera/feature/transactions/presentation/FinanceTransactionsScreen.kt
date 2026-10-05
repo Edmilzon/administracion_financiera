@@ -60,7 +60,6 @@ import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceTransact
 import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.TransactionKind
 import com.moonspace.adminfinanciera.feature.transactions.domain.buildFinanceTransactionReport
-import com.moonspace.adminfinanciera.feature.transactions.domain.filterFinanceTransactions
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.text.DateFormat
@@ -81,27 +80,11 @@ fun FinanceTransactionsScreen(
     onDeleteTransaction: (String) -> Unit,
     onSaveCategory: (CategoryDraft) -> Unit,
     onDeactivateCategory: (String) -> Unit,
-    onSelectMonth: (String?) -> Unit,
-    onSelectKind: (TransactionKind?) -> Unit,
-    onSelectMember: (String?) -> Unit,
-    onClearFilters: () -> Unit,
     onClearMessages: () -> Unit
 ) {
-    val filteredTransactions = remember(
-        state.transactions,
-        state.selectedMonthKey,
-        state.selectedKind,
-        state.selectedMemberId
-    ) {
-        filterFinanceTransactions(
-            state.transactions,
-            state.selectedMonthKey,
-            state.selectedKind,
-            state.selectedMemberId
-        )
-    }
-    val report = remember(filteredTransactions, state.memberEmails) {
-        buildFinanceTransactionReport(filteredTransactions, state.memberEmails)
+    val transactions = state.transactions
+    val report = remember(transactions, state.memberEmails) {
+        buildFinanceTransactionReport(transactions, state.memberEmails)
     }
     var isShowingEditor by rememberSaveable { mutableStateOf(false) }
     var transactionToEdit by remember { mutableStateOf<FinanceTransaction?>(null) }
@@ -158,14 +141,6 @@ fun FinanceTransactionsScreen(
                 onAction = onOpenUsers
             )
             else -> {
-                FinanceStatusBanner(
-                    message = if (state.pendingSyncCount > 0) {
-                        stringResource(R.string.transactions_pending_sync_count, state.pendingSyncCount)
-                    } else {
-                        stringResource(R.string.transactions_pending_sync_empty)
-                    },
-                    tone = if (state.pendingSyncCount > 0) FinanceStatusTone.Warning else FinanceStatusTone.Info
-                )
                 if (state.noticeMessage != null) {
                     FinanceStatusBanner(state.noticeMessage, tone = FinanceStatusTone.Success)
                 }
@@ -202,24 +177,8 @@ fun FinanceTransactionsScreen(
                     verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
                     contentPadding = PaddingValues(bottom = FinanceSpacing.Large)
                 ) {
-                    item(key = "transaction_filters") {
-                        TransactionFilterPanel(
-                            monthKeys = state.availableMonthKeys,
-                            selectedMonthKey = state.selectedMonthKey,
-                            selectedKind = state.selectedKind,
-                            selectedMemberId = state.selectedMemberId,
-                            memberEmails = state.memberEmails,
-                            currentUserId = user.id,
-                            canFilterMembers = state.canManageCategories,
-                            hasActiveFilters = state.hasActiveFilters,
-                            onSelectMonth = onSelectMonth,
-                            onSelectKind = onSelectKind,
-                            onSelectMember = onSelectMember,
-                            onClearFilters = onClearFilters
-                        )
-                    }
                     item(key = "transaction_summary") {
-                        TransactionSummaryCard(report, state.selectedMonthKey)
+                        TransactionSummaryCard(report)
                     }
                     if (report.categoryTotals.isNotEmpty()) {
                         item(key = "category_breakdown_header") {
@@ -258,30 +217,20 @@ fun FinanceTransactionsScreen(
                             title = stringResource(R.string.transactions_list_title),
                             supportingText = pluralStringResource(
                                 R.plurals.transactions_results_count,
-                                filteredTransactions.size,
-                                filteredTransactions.size
+                                transactions.size,
+                                transactions.size
                             )
                         )
                     }
-                    if (filteredTransactions.isEmpty()) {
+                    if (transactions.isEmpty()) {
                         item(key = "transaction_empty_state") {
                             FinanceEmptyState(
-                                title = stringResource(
-                                    if (state.transactions.isEmpty()) R.string.transactions_empty_title
-                                    else R.string.transactions_no_filter_results_title
-                                ),
-                                description = stringResource(
-                                    if (state.transactions.isEmpty()) R.string.transactions_empty_description
-                                    else R.string.transactions_no_filter_results_description
-                                ),
-                                actionLabel = if (state.hasActiveFilters) {
-                                    stringResource(R.string.transactions_clear_filters)
-                                } else null,
-                                onAction = if (state.hasActiveFilters) onClearFilters else null
+                                title = stringResource(R.string.transactions_empty_title),
+                                description = stringResource(R.string.transactions_empty_description)
                             )
                         }
                     } else {
-                        items(filteredTransactions, key = FinanceTransaction::id) { transaction ->
+                        items(transactions, key = FinanceTransaction::id) { transaction ->
                             val isOwn = transaction.createdBy == user.id
                             val author = if (isOwn) {
                                 stringResource(R.string.transactions_registered_by_you)
@@ -356,124 +305,9 @@ fun FinanceTransactionsScreen(
     }
 }
 
-private data class FinanceFilterOption(val key: String?, val label: String)
-
 @Composable
-private fun TransactionFilterPanel(
-    monthKeys: List<String>,
-    selectedMonthKey: String?,
-    selectedKind: TransactionKind?,
-    selectedMemberId: String?,
-    memberEmails: Map<String, String>,
-    currentUserId: String,
-    canFilterMembers: Boolean,
-    hasActiveFilters: Boolean,
-    onSelectMonth: (String?) -> Unit,
-    onSelectKind: (TransactionKind?) -> Unit,
-    onSelectMember: (String?) -> Unit,
-    onClearFilters: () -> Unit
-) {
-    val monthOptions = listOf(
-        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_months))
-    ) + monthKeys.map { FinanceFilterOption(it, formatMonthLabel(it)) }
-    val kindOptions = listOf(
-        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_types)),
-        FinanceFilterOption(TransactionKind.Income.apiValue, stringResource(R.string.transactions_filter_income)),
-        FinanceFilterOption(TransactionKind.Expense.apiValue, stringResource(R.string.transactions_filter_expenses))
-    )
-    val youLabel = stringResource(R.string.users_you)
-    val memberOptions = listOf(
-        FinanceFilterOption(null, stringResource(R.string.transactions_filter_all_people))
-    ) + memberEmails.entries
-        .sortedBy { it.value.lowercase() }
-        .map { (userId, email) ->
-            FinanceFilterOption(userId, if (userId == currentUserId) youLabel else email)
-        }
-
-    FinanceCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(FinanceSpacing.Medium),
-            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)
-        ) {
-            FinanceSectionHeader(title = stringResource(R.string.transactions_filter_title))
-            FinanceDropdownFilter(
-                label = stringResource(R.string.transactions_filter_month),
-                selectedKey = selectedMonthKey,
-                options = monthOptions,
-                onSelected = onSelectMonth
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-                FinanceDropdownFilter(
-                    label = stringResource(R.string.transactions_filter_type),
-                    selectedKey = selectedKind?.apiValue,
-                    options = kindOptions,
-                    onSelected = { value ->
-                        onSelectKind(value?.let { TransactionKind.fromApiValue(it) })
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                if (canFilterMembers) {
-                    FinanceDropdownFilter(
-                        label = stringResource(R.string.transactions_filter_person),
-                        selectedKey = selectedMemberId,
-                        options = memberOptions,
-                        onSelected = onSelectMember,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            if (hasActiveFilters) {
-                FinanceButton(
-                    label = stringResource(R.string.transactions_clear_filters),
-                    onClick = onClearFilters,
-                    variant = FinanceButtonVariant.Text
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FinanceDropdownFilter(
-    label: String,
-    selectedKey: String?,
-    options: List<FinanceFilterOption>,
-    onSelected: (String?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.firstOrNull { it.key == selectedKey }?.label
-        ?: options.first().label
-    Box(modifier.fillMaxWidth()) {
-        FinanceButton(
-            label = "$label: $selectedLabel",
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth(),
-            variant = FinanceButtonVariant.Secondary
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = {
-                        onSelected(option.key)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TransactionSummaryCard(report: FinanceTransactionReport, selectedMonthKey: String?) {
-    val periodLabel = selectedMonthKey?.let(::formatMonthLabel)
-        ?: stringResource(R.string.transactions_filter_all_months)
+private fun TransactionSummaryCard(report: FinanceTransactionReport) {
+    val periodLabel = stringResource(R.string.transactions_period_all)
     FinanceCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -965,17 +799,6 @@ private fun formatDate(value: String): String = runCatching {
 }.getOrDefault(value)
 
 private fun formatAmountInput(centavos: Long): String = BigDecimal.valueOf(centavos, 2).toPlainString()
-
-private fun formatMonthLabel(monthKey: String): String = runCatching {
-    val locale = Locale.forLanguageTag("es-BO")
-    val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply {
-        isLenient = false
-        timeZone = TimeZone.getTimeZone("UTC")
-    }.parse("$monthKey-01") ?: return@runCatching monthKey
-    SimpleDateFormat("MMMM yyyy", locale)
-        .format(date)
-        .replaceFirstChar { first -> first.titlecase(locale) }
-}.getOrDefault(monthKey)
 
 private fun formatBobs(centavos: Long): String = formatBobs(BigInteger.valueOf(centavos))
 

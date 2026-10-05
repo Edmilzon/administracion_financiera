@@ -44,7 +44,6 @@ data class FinanceBudgetsUiState(
     val categories: List<FinanceCategory> = emptyList(),
     val transactions: List<FinanceTransaction> = emptyList(),
     val memberEmails: Map<String, String> = emptyMap(),
-    val pendingSyncCount: Int = 0,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val noticeMessage: String? = null,
@@ -69,7 +68,6 @@ class FinanceBudgetsViewModel(
     private var categoryJob: Job? = null
     private var transactionJob: Job? = null
     private var budgetJob: Job? = null
-    private var pendingJob: Job? = null
     private var lastLoadAttemptAt = 0L
 
     fun load(user: AuthUser, forceRefresh: Boolean = false) {
@@ -195,11 +193,6 @@ class FinanceBudgetsViewModel(
                 _uiState.value = _uiState.value.copy(transactions = transactions)
             }
         }
-        pendingJob = viewModelScope.launch {
-            financialRepository.observePendingCount(user.id).collect { count ->
-                _uiState.value = _uiState.value.copy(pendingSyncCount = count)
-            }
-        }
         budgetJob = observeBudgets(user, householdId, role, _uiState.value.selectedMonthStart)
     }
 
@@ -224,11 +217,9 @@ class FinanceBudgetsViewModel(
         categoryJob?.cancel()
         transactionJob?.cancel()
         budgetJob?.cancel()
-        pendingJob?.cancel()
         categoryJob = null
         transactionJob = null
         budgetJob = null
-        pendingJob = null
     }
 
     private fun submit(action: suspend () -> Unit) {

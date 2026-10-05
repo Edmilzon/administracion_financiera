@@ -242,10 +242,6 @@ fun FinanceNavigation() {
                         onDeleteTransaction = transactionsViewModel::deleteTransaction,
                         onSaveCategory = transactionsViewModel::saveCategory,
                         onDeactivateCategory = transactionsViewModel::deactivateCategory,
-                        onSelectMonth = transactionsViewModel::selectMonth,
-                        onSelectKind = transactionsViewModel::selectKind,
-                        onSelectMember = transactionsViewModel::selectMember,
-                        onClearFilters = transactionsViewModel::clearFilters,
                         onClearMessages = transactionsViewModel::clearMessages
                     )
                 } else if (activeDestination == DESTINATION_BUDGETS) {

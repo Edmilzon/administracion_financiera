@@ -48,7 +48,6 @@ data class FinanceReportsUiState(
     val selectedMemberId: String? = null,
     val report: FinanceReport? = null,
     val generatedFile: GeneratedFinanceReport? = null,
-    val pendingSyncCount: Int = 0,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null
 )
@@ -66,7 +65,6 @@ class FinanceReportsViewModel(
     private var loadJob: Job? = null
     private var transactionJob: Job? = null
     private var categoryJob: Job? = null
-    private var pendingJob: Job? = null
     private var lastLoadAttemptAt = 0L
     private var transactions: List<FinanceTransaction> = emptyList()
     private var categories: List<FinanceCategory> = emptyList()
@@ -105,8 +103,7 @@ class FinanceReportsViewModel(
                         isLoading = false,
                         hasHousehold = false,
                         report = null,
-                        generatedFile = null,
-                        pendingSyncCount = 0
+                        generatedFile = null
                     )
                     return@launch
                 }
@@ -124,8 +121,6 @@ class FinanceReportsViewModel(
                     householdId = currentHouseholdId,
                     includeInactive = true
                 ).first()
-                val pendingCount = financialRepository.observePendingCount(user.id).first()
-
                 transactions = newTransactions
                 categories = newCategories
                 members = snapshot.members
@@ -135,7 +130,6 @@ class FinanceReportsViewModel(
                     isLoading = false,
                     hasHousehold = true,
                     isAdministrator = canReadWholeHousehold,
-                    pendingSyncCount = pendingCount,
                     errorMessage = null,
                     actionErrorMessage = null
                 )
@@ -297,20 +291,13 @@ class FinanceReportsViewModel(
                     rebuildReport(user)
                 }
         }
-        pendingJob = viewModelScope.launch {
-            financialRepository.observePendingCount(user.id).collect { count ->
-                _uiState.value = _uiState.value.copy(pendingSyncCount = count)
-            }
-        }
     }
 
     private fun stopObserving() {
         transactionJob?.cancel()
         categoryJob?.cancel()
-        pendingJob?.cancel()
         transactionJob = null
         categoryJob = null
-        pendingJob = null
     }
 
     override fun onCleared() {

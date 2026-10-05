@@ -174,10 +174,6 @@ fun FinanceReportsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                FinanceStatusBanner(
-                    message = stringResource(R.string.reports_local_data_note),
-                    tone = if (state.pendingSyncCount > 0) FinanceStatusTone.Warning else FinanceStatusTone.Info
-                )
                 if (deliveryMessage != null) {
                     FinanceStatusBanner(
                         message = requireNotNull(deliveryMessage),

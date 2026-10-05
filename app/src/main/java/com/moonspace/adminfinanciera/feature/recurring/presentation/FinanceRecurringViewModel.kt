@@ -34,7 +34,6 @@ data class FinanceRecurringUiState(
     val rules: List<FinanceRecurringRule> = emptyList(),
     val categories: List<FinanceCategory> = emptyList(),
     val memberEmails: Map<String, String> = emptyMap(),
-    val pendingSyncCount: Int = 0,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null,
     val noticeMessage: String? = null,
@@ -55,7 +54,6 @@ class FinanceRecurringViewModel(
     private var loadJob: Job? = null
     private var rulesJob: Job? = null
     private var categoriesJob: Job? = null
-    private var pendingJob: Job? = null
     private var lastLoadAttemptAt = 0L
 
     fun load(user: AuthUser, forceRefresh: Boolean = false) {
@@ -170,19 +168,13 @@ class FinanceRecurringViewModel(
             financialRepository.observeCategories(user.id, householdId, includeInactive = true)
                 .collect { categories -> _uiState.value = _uiState.value.copy(categories = categories) }
         }
-        pendingJob = viewModelScope.launch {
-            financialRepository.observePendingCount(user.id)
-                .collect { count -> _uiState.value = _uiState.value.copy(pendingSyncCount = count) }
-        }
     }
 
     private fun stopObserving() {
         rulesJob?.cancel()
         categoriesJob?.cancel()
-        pendingJob?.cancel()
         rulesJob = null
         categoriesJob = null
-        pendingJob = null
     }
 
     private fun submit(action: suspend () -> Unit) {

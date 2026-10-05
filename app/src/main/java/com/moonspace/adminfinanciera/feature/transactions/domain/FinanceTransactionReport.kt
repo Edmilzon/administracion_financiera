@@ -25,17 +25,6 @@ data class FinanceTransactionReport(
     val memberTotals: List<FinanceMemberTotal>
 )
 
-fun filterFinanceTransactions(
-    transactions: List<FinanceTransaction>,
-    monthKey: String?,
-    kind: TransactionKind?,
-    memberId: String?
-): List<FinanceTransaction> = transactions.filter { transaction ->
-    (monthKey == null || transaction.occurredOn.startsWith(monthKey)) &&
-        (kind == null || transaction.kind == kind) &&
-        (memberId == null || transaction.createdBy == memberId)
-}
-
 fun buildFinanceTransactionReport(
     transactions: List<FinanceTransaction>,
     memberEmails: Map<String, String>

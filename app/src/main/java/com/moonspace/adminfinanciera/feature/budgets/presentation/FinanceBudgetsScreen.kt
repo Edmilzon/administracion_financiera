@@ -177,18 +177,6 @@ fun FinanceBudgetsScreen(
             else -> {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                        FinanceStatusBanner(
-                            message = if (state.pendingSyncCount > 0) {
-                                pluralStringResource(
-                                    R.plurals.budgets_pending_sync_count,
-                                    state.pendingSyncCount,
-                                    state.pendingSyncCount
-                                )
-                            } else {
-                                stringResource(R.string.budgets_sync_note)
-                            },
-                            tone = if (state.pendingSyncCount > 0) FinanceStatusTone.Warning else FinanceStatusTone.Info
-                        )
                         if (state.role == HouseholdRole.Admin) {
                             FinanceStatusBanner(
                                 message = stringResource(R.string.budgets_admin_note),
