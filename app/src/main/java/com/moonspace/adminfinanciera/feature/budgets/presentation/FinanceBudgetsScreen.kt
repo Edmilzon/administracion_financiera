@@ -177,12 +177,6 @@ fun FinanceBudgetsScreen(
             else -> {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                        if (state.role == HouseholdRole.Admin) {
-                            FinanceStatusBanner(
-                                message = stringResource(R.string.budgets_admin_note),
-                                tone = FinanceStatusTone.Info
-                            )
-                        }
                         state.noticeMessage?.let {
                             FinanceStatusBanner(it, tone = FinanceStatusTone.Success)
                         }

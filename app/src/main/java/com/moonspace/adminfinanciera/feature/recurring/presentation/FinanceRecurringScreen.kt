@@ -133,10 +133,6 @@ fun FinanceRecurringScreen(
             else -> {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                        FinanceStatusBanner(
-                            message = stringResource(R.string.recurring_reminder_schedule),
-                            tone = FinanceStatusTone.Info
-                        )
                         state.noticeMessage?.let {
                             FinanceStatusBanner(it, tone = FinanceStatusTone.Success)
                         }
