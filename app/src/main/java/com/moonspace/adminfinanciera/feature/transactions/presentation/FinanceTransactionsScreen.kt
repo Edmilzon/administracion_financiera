@@ -483,42 +483,80 @@ private fun TransactionEditorSheet(
                     else FinanceButtonVariant.Secondary
                 )
             }
-            FinanceAmountField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = stringResource(R.string.transactions_amount_label),
-                currencyLabel = stringResource(R.string.transactions_currency),
-                isError = amount.isNotBlank() && parsedAmount == null,
-                supportingText = if (amount.isNotBlank() && parsedAmount == null) {
-                    stringResource(R.string.transactions_invalid_amount)
-                } else null
-            )
-            FinanceDateField(
-                value = formatDate(occurredOn),
-                label = stringResource(R.string.transactions_date_label),
-                chooseDateLabel = stringResource(R.string.transactions_choose_date),
-                onOpenPicker = { isDatePickerOpen = true }
-            )
-            Text(stringResource(R.string.transactions_category_label), style = MaterialTheme.typography.labelLarge)
-            Box {
-                FinanceButton(
-                    label = selectedCategory?.name ?: stringResource(R.string.transactions_choose_category),
-                    onClick = { isCategoryMenuOpen = true },
-                    variant = FinanceButtonVariant.Secondary,
-                    enabled = activeCategories.isNotEmpty()
-                )
-                DropdownMenu(
-                    expanded = isCategoryMenuOpen,
-                    onDismissRequest = { isCategoryMenuOpen = false }
-                ) {
-                    activeCategories.forEach { category ->
-                        DropdownMenuItem(
-                            text = { Text(category.name) },
-                            onClick = {
-                                categoryId = category.id
-                                isCategoryMenuOpen = false
-                            }
+            if (initialTransaction == null) {
+                FinanceCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(FinanceSpacing.Medium),
+                        verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.transactions_date_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Text(
+                            text = formatDate(occurredOn),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            } else {
+                FinanceDateField(
+                    value = formatDate(occurredOn),
+                    label = stringResource(R.string.transactions_date_label),
+                    chooseDateLabel = stringResource(R.string.transactions_choose_date),
+                    onOpenPicker = { isDatePickerOpen = true }
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
+                verticalAlignment = Alignment.Top
+            ) {
+                FinanceAmountField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = stringResource(R.string.transactions_amount_label),
+                    currencyLabel = stringResource(R.string.transactions_currency),
+                    modifier = Modifier.weight(1f),
+                    isError = amount.isNotBlank() && parsedAmount == null,
+                    supportingText = if (amount.isNotBlank() && parsedAmount == null) {
+                        stringResource(R.string.transactions_invalid_amount)
+                    } else null
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)
+                ) {
+                    Text(
+                        text = stringResource(R.string.transactions_category_label),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        FinanceButton(
+                            label = selectedCategory?.name
+                                ?: stringResource(R.string.transactions_choose_category),
+                            onClick = { isCategoryMenuOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            variant = FinanceButtonVariant.Secondary,
+                            enabled = activeCategories.isNotEmpty(),
+                            compact = true
+                        )
+                        DropdownMenu(
+                            expanded = isCategoryMenuOpen,
+                            onDismissRequest = { isCategoryMenuOpen = false }
+                        ) {
+                            activeCategories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    onClick = {
+                                        categoryId = category.id
+                                        isCategoryMenuOpen = false
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
