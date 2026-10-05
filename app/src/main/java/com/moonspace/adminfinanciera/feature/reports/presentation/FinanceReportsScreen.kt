@@ -162,18 +162,11 @@ fun FinanceReportsScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
-                    Text(
-                        text = stringResource(R.string.reports_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.reports_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.reports_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 if (deliveryMessage != null) {
                     FinanceStatusBanner(
                         message = requireNotNull(deliveryMessage),

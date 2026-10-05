@@ -96,18 +96,11 @@ fun HouseholdMembersScreen(
             )
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
-            Text(
-                text = stringResource(R.string.users_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.users_description),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(
+            text = stringResource(R.string.users_title),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
 
         AccountProfileCard(
             user = user,

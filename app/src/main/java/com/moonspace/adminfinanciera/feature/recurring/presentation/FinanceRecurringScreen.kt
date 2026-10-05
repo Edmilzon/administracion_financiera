@@ -97,20 +97,11 @@ fun FinanceRecurringScreen(
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
-                    Text(
-                        text = stringResource(R.string.recurring_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.recurring_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = stringResource(R.string.recurring_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
         when {
             state.isLoading -> item { FinanceLoadingState(stringResource(R.string.recurring_loading)) }

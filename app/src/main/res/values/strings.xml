@@ -30,7 +30,6 @@
     <string name="users_sign_out">Cerrar sesión</string>
     <string name="users_signing_out">Cerrando sesión…</string>
     <string name="users_title">Integrantes y roles</string>
-    <string name="users_description">Administra las cuentas que tienen acceso a este espacio financiero.</string>
     <string name="users_account_title">Mi cuenta</string>
     <string name="users_edit_account">Editar datos y contraseña</string>
     <string name="users_edit_account_title">Editar mi cuenta</string>
@@ -144,7 +143,6 @@
     <string name="transactions_registered_by_you">Registrado por ti</string>
     <string name="transactions_registered_by_member">Registrado por %1$s</string>
     <string name="budgets_title">Presupuestos</string>
-    <string name="budgets_description">Los límites generales suman en bruto ingresos y gastos; los de categoría siguen sus movimientos. Administra los tuyos y consulta los del espacio.</string>
     <string name="budgets_loading">Cargando presupuestos…</string>
     <string name="budgets_load_failed">No se pudieron cargar los presupuestos.</string>
     <string name="budgets_retry">Intentar de nuevo</string>
@@ -190,7 +188,6 @@
     <string name="budgets_record_unavailable">Ese presupuesto ya no está disponible o no tienes permiso para modificarlo.</string>
     <string name="budgets_operation_failed">No se pudo guardar el cambio. Inténtalo de nuevo.</string>
     <string name="recurring_title">Recurrentes</string>
-    <string name="recurring_description">Programa ingresos y gastos periódicos. Cada vencimiento necesita tu confirmación antes de registrarse.</string>
     <string name="recurring_loading">Cargando reglas recurrentes…</string>
     <string name="recurring_load_failed">No se pudieron cargar las reglas recurrentes.</string>
     <string name="recurring_retry">Intentar de nuevo</string>
@@ -283,7 +280,6 @@
         <item quantity="other">Cada %1$d meses</item>
     </plurals>
     <string name="reports_title">Informes</string>
-    <string name="reports_description">Consulta tus ingresos y gastos y prepara archivos para guardar, compartir o imprimir.</string>
     <string name="reports_loading">Preparando los datos del informe…</string>
     <string name="reports_load_failed">No se pudieron cargar los datos disponibles para el informe.</string>
     <string name="reports_load_failed_title">No se pudo preparar el informe</string>

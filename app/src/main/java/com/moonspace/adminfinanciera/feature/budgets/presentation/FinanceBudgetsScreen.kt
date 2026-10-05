@@ -141,20 +141,11 @@ fun FinanceBudgetsScreen(
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
-                    Text(
-                        text = stringResource(R.string.budgets_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = stringResource(R.string.budgets_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = stringResource(R.string.budgets_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
         when {
             state.isLoading -> item { FinanceLoadingState(stringResource(R.string.budgets_loading)) }
