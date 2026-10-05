@@ -48,6 +48,7 @@ data class FinanceReportsUiState(
     val selectedMemberId: String? = null,
     val report: FinanceReport? = null,
     val generatedFile: GeneratedFinanceReport? = null,
+    val generatedFileVersion: Int = 0,
     val errorMessage: String? = null,
     val actionErrorMessage: String? = null
 )
@@ -200,6 +201,7 @@ class FinanceReportsViewModel(
                 _uiState.value = _uiState.value.copy(
                     isGenerating = false,
                     generatedFile = result,
+                    generatedFileVersion = _uiState.value.generatedFileVersion + 1,
                     actionErrorMessage = null
                 )
             } catch (cancelled: CancellationException) {

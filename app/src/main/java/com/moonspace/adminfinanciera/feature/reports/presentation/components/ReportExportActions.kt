@@ -41,11 +41,6 @@ fun ReportExportActions(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = stringResource(R.string.reports_export_description),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
             if (generatedFile == null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
                     FinanceButton(

@@ -40,6 +40,7 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceEmptyState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceErrorState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceListRow
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
+import com.moonspace.adminfinanciera.core.ui.components.FinancePageTitle
 import com.moonspace.adminfinanciera.core.ui.components.FinanceSectionHeader
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
@@ -113,11 +114,7 @@ fun FinanceTransactionsScreen(
             .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Medium),
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
-        Text(
-            text = stringResource(R.string.transactions_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        FinancePageTitle(title = stringResource(R.string.transactions_title))
 
         when {
             state.isLoading -> FinanceLoadingState(stringResource(R.string.transactions_loading))

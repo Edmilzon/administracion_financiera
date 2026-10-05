@@ -33,6 +33,7 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceCard
 import com.moonspace.adminfinanciera.core.ui.components.FinanceEmptyState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceErrorState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
+import com.moonspace.adminfinanciera.core.ui.components.FinancePageTitle
 import com.moonspace.adminfinanciera.core.ui.components.FinanceSectionHeader
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusPill
@@ -176,11 +177,7 @@ fun FinanceDebtsScreen(
         verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
     ) {
         item {
-            Text(
-                text = stringResource(R.string.debts_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            FinancePageTitle(title = stringResource(R.string.debts_title))
         }
         when {
             state.isLoading -> item { FinanceLoadingState(stringResource(R.string.debts_loading)) }

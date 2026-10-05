@@ -189,8 +189,8 @@ fun FinanceNavigation() {
                     R.string.nav_transactions,
                     R.drawable.ic_nav_transactions
                 ),
-                FinanceNavigationDestination(DESTINATION_BUDGETS, R.string.nav_budgets, R.drawable.ic_nav_budgets),
                 FinanceNavigationDestination(DESTINATION_DEBTS, R.string.nav_debts, R.drawable.ic_nav_debts),
+                FinanceNavigationDestination(DESTINATION_BUDGETS, R.string.nav_budgets, R.drawable.ic_nav_budgets),
                 FinanceNavigationDestination(
                     DESTINATION_RECURRING,
                     R.string.nav_recurring,

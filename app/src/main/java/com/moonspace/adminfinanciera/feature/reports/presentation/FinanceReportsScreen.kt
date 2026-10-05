@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceButtonVariant
 import com.moonspace.adminfinanciera.core.ui.components.FinanceEmptyState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceErrorState
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
+import com.moonspace.adminfinanciera.core.ui.components.FinancePageTitle
 import com.moonspace.adminfinanciera.core.ui.components.FinanceSectionHeader
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
@@ -78,8 +80,25 @@ fun FinanceReportsScreen(
     var showingEndPicker by remember { mutableStateOf(false) }
     var deliveryMessage by remember { mutableStateOf<String?>(null) }
     var deliveryError by remember { mutableStateOf(false) }
+    var pendingPdfShareVersion by remember { mutableStateOf<Int?>(null) }
 
     val generatedFile = state.generatedFile
+    LaunchedEffect(state.generatedFileVersion, state.actionErrorMessage) {
+        val requestedVersion = pendingPdfShareVersion ?: return@LaunchedEffect
+        if (state.generatedFileVersion >= requestedVersion) {
+            val pdf = state.generatedFile?.takeIf { it.format == ReportExportFormat.Pdf }
+            pendingPdfShareVersion = null
+            if (pdf != null) {
+                deliveryMessage = null
+                shareGeneratedFile(context, pdf, onDeliveryFailed) { message ->
+                    deliveryMessage = message
+                    deliveryError = true
+                }
+            }
+        } else if (state.actionErrorMessage != null && !state.isGenerating) {
+            pendingPdfShareVersion = null
+        }
+    }
     val savePdfLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument(ReportExportFormat.Pdf.mimeType)
     ) { uri ->
@@ -162,11 +181,7 @@ fun FinanceReportsScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                Text(
-                    text = stringResource(R.string.reports_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                FinancePageTitle(title = stringResource(R.string.reports_title))
                 if (deliveryMessage != null) {
                     FinanceStatusBanner(
                         message = requireNotNull(deliveryMessage),
@@ -206,7 +221,12 @@ fun FinanceReportsScreen(
                     deliveryMessage = null
                     onResetFilters()
                 },
-                onGenerate = onGenerate,
+                onGenerate = { format ->
+                    if (format == ReportExportFormat.Pdf) {
+                        pendingPdfShareVersion = state.generatedFileVersion + 1
+                    }
+                    onGenerate(format)
+                },
                 onSave = {
                     state.generatedFile?.let { currentFile ->
                         deliveryMessage = null

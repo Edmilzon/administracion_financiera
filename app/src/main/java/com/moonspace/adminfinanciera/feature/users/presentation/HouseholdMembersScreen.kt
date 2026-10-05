@@ -30,6 +30,7 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceButton
 import com.moonspace.adminfinanciera.core.ui.components.FinanceButtonVariant
 import com.moonspace.adminfinanciera.core.ui.components.FinanceCard
 import com.moonspace.adminfinanciera.core.ui.components.FinanceLoadingState
+import com.moonspace.adminfinanciera.core.ui.components.FinancePageTitle
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusPill
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
@@ -96,11 +97,16 @@ fun HouseholdMembersScreen(
             )
         }
 
-        Text(
-            text = stringResource(R.string.users_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        FinancePageTitle(title = stringResource(R.string.users_title))
+
+        if (snapshot?.householdId != null && snapshot.currentUserRole == HouseholdRole.Admin) {
+            FinanceButton(
+                label = stringResource(R.string.users_add_action),
+                onClick = { isAddMemberOpen = true },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isSubmitting
+            )
+        }
 
         AccountProfileCard(
             user = user,
@@ -162,7 +168,6 @@ fun HouseholdMembersScreen(
                 members = snapshot.members,
                 currentUserId = user.id,
                 isSubmitting = state.isSubmitting,
-                onAddMember = { isAddMemberOpen = true },
                 onChangeRole = { selectedMemberForRole = it },
                 onRemove = { selectedMemberForRemoval = it }
             )
@@ -382,7 +387,6 @@ private fun AdminMembersContent(
     members: List<HouseholdMember>,
     currentUserId: String,
     isSubmitting: Boolean,
-    onAddMember: () -> Unit,
     onChangeRole: (HouseholdMember) -> Unit,
     onRemove: (HouseholdMember) -> Unit
 ) {
@@ -392,12 +396,6 @@ private fun AdminMembersContent(
             text = stringResource(R.string.users_members_count, members.size),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
-        )
-        FinanceButton(
-            label = stringResource(R.string.users_add_action),
-            onClick = onAddMember,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isSubmitting
         )
         members.forEach { member ->
             MemberCard(

@@ -382,7 +382,6 @@
     <string name="reports_no_movements_description">Cambia el período o ajusta el tipo, categoría o persona para ver otros resultados.</string>
     <string name="reports_movement_metadata">%1$s · %2$s · %3$s</string>
     <string name="reports_export_title">Exportar informe</string>
-    <string name="reports_export_description">El PDF se puede imprimir. Guarda el archivo en tu teléfono o compártelo con otra aplicación.</string>
     <string name="reports_generate_pdf">Generar PDF</string>
     <string name="reports_generate_excel">Generar Excel</string>
     <string name="reports_generating">Generando archivo…</string>
