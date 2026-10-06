@@ -14,6 +14,7 @@ import com.moonspace.adminfinanciera.core.database.entities.TransactionEntity
 import com.moonspace.adminfinanciera.core.network.NeonApiConfig
 import com.moonspace.adminfinanciera.core.network.NeonDataApiClient
 import com.moonspace.adminfinanciera.core.network.NeonDataApiMethod
+import com.moonspace.adminfinanciera.core.sync.FinanceSyncRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthRepository
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -33,8 +34,8 @@ class NeonFinanceSyncRepository(
     private val dataApiClient: NeonDataApiClient,
     private val authRepository: AuthRepository,
     private val databases: EncryptedFinanceDatabaseProvider
-) {
-    suspend fun syncAccount(accountId: String) {
+) : FinanceSyncRepository {
+    override suspend fun syncAccount(accountId: String) {
         require(accountId.isNotBlank())
         val accountLock = accountLocks.getOrPut(accountId) { Mutex() }
         accountLock.withLock { syncAccountLocked(accountId) }

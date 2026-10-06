@@ -90,7 +90,8 @@ fun FinanceNavigation() {
                 FinanceTransactionsViewModel.Factory(
                     context,
                     container.householdMembersRepository,
-                    container.financialRepository
+                    container.financialRepository,
+                    container.financeSyncRepository
                 )
             }
         )

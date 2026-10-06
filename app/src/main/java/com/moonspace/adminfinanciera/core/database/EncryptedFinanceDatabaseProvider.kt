@@ -35,6 +35,7 @@ class EncryptedFinanceDatabaseProvider(context: Context) {
                     FinanceDatabase::class.java,
                     "finance_$accountHash.db"
                 ).openHelperFactory(factory)
+                    .enableMultiInstanceInvalidation()
                     .addMigrations(
                         FinanceRoomMigrations.MIGRATION_1_2,
                         FinanceRoomMigrations.MIGRATION_2_3,

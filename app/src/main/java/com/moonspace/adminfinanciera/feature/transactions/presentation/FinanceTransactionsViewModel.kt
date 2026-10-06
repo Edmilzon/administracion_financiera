@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.moonspace.adminfinanciera.R
+import com.moonspace.adminfinanciera.core.sync.FinanceSyncRepository
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthUser
 import com.moonspace.adminfinanciera.feature.transactions.domain.CategoryDraft
 import com.moonspace.adminfinanciera.feature.transactions.domain.FinanceCategory
@@ -47,7 +48,8 @@ data class FinanceTransactionsUiState(
 class FinanceTransactionsViewModel(
     context: Context,
     private val householdMembersRepository: HouseholdMembersRepository,
-    private val financialRepository: FinancialRepository
+    private val financialRepository: FinancialRepository,
+    private val financeSyncRepository: FinanceSyncRepository
 ) : ViewModel() {
     private val appContext = context.applicationContext
     private val _uiState = MutableStateFlow(FinanceTransactionsUiState())
@@ -94,6 +96,15 @@ class FinanceTransactionsViewModel(
                 }
 
                 financialRepository.prepareHousehold(user.id, householdId, role.apiValue)
+                try {
+                    // Keep the first screen loading until the authenticated account's remote
+                    // snapshot has been applied to Room; the WorkManager request remains as backup.
+                    financeSyncRepository.syncAccount(user.id)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Room remains usable offline and the scheduled worker retries in background.
+                }
                 val memberEmails = snapshot.members.associate { it.userId to it.email }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -247,12 +258,18 @@ class FinanceTransactionsViewModel(
     class Factory(
         private val context: Context,
         private val householdMembersRepository: HouseholdMembersRepository,
-        private val financialRepository: FinancialRepository
+        private val financialRepository: FinancialRepository,
+        private val financeSyncRepository: FinanceSyncRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(FinanceTransactionsViewModel::class.java))
-            return FinanceTransactionsViewModel(context, householdMembersRepository, financialRepository) as T
+            return FinanceTransactionsViewModel(
+                context,
+                householdMembersRepository,
+                financialRepository,
+                financeSyncRepository
+            ) as T
         }
     }
 }
