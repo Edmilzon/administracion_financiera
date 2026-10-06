@@ -41,7 +41,8 @@ class EncryptedFinanceDatabaseProvider(context: Context) {
                         FinanceRoomMigrations.MIGRATION_2_3,
                         FinanceRoomMigrations.MIGRATION_3_4,
                         FinanceRoomMigrations.MIGRATION_4_5,
-                        FinanceRoomMigrations.MIGRATION_5_6
+                        FinanceRoomMigrations.MIGRATION_5_6,
+                        FinanceRoomMigrations.MIGRATION_6_7
                     )
                     .build(),
                 passphrase = passphrase

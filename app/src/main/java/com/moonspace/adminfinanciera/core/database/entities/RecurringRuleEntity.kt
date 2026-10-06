@@ -6,6 +6,7 @@ import androidx.room.*
     tableName = "recurring_rules",
     indices = [
         Index("account_id"),
+        Index(value = ["household_id", "category_id"]),
         Index(value = ["household_id", "next_due_on", "is_active"]),
         Index(value = ["household_id", "created_by", "next_due_on"])
     ],

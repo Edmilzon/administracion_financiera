@@ -123,4 +123,13 @@ object FinanceRoomMigrations {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_debt_payments_household_id_created_by` ON `debt_payments` (`household_id`, `created_by`)")
         }
     }
+
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_recurring_rules_household_id_category_id` " +
+                    "ON `recurring_rules` (`household_id`, `category_id`)"
+            )
+        }
+    }
 }

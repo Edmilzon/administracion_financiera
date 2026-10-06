@@ -38,7 +38,7 @@ import com.moonspace.adminfinanciera.core.database.entities.TransactionEntity
         TransactionDeletionMarkerEntity::class,
         SyncStateEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class FinanceDatabase : RoomDatabase() {
