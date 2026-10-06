@@ -30,7 +30,7 @@ fun LoginGlassPanel(
             width = 1.dp,
             brush = Brush.linearGradient(
                 listOf(
-                    colorScheme.onSurface.copy(alpha = GLASS_BORDER_ALPHA),
+                    colorScheme.onSurface.copy(alpha = LOGIN_GLASS_BORDER_ALPHA),
                     colorScheme.primary.copy(alpha = 0.42f),
                     colorScheme.onSurface.copy(alpha = 0.08f)
                 )
@@ -57,4 +57,4 @@ fun LoginGlassPanel(
     }
 }
 
-private const val GLASS_BORDER_ALPHA = 0.18f
+internal const val LOGIN_GLASS_BORDER_ALPHA = 0.18f

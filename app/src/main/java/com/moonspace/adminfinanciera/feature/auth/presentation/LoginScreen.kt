@@ -53,6 +53,7 @@ import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 import com.moonspace.adminfinanciera.feature.auth.presentation.components.LoginGlassBackdrop
 import com.moonspace.adminfinanciera.feature.auth.presentation.components.LoginGlassPanel
+import com.moonspace.adminfinanciera.feature.auth.presentation.components.LOGIN_GLASS_BORDER_ALPHA
 
 @Composable
 fun LoginScreen(
@@ -120,7 +121,7 @@ fun LoginScreen(
                                 .border(
                                     BorderStroke(
                                         1.dp,
-                                        colorScheme.onSurface.copy(alpha = GLASS_BORDER_ALPHA)
+                                        colorScheme.onSurface.copy(alpha = LOGIN_GLASS_BORDER_ALPHA)
                                     ),
                                     RoundedCornerShape(18.dp)
                                 )

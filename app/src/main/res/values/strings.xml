@@ -35,7 +35,7 @@
     <string name="users_edit_account_title">Editar mi cuenta</string>
     <string name="users_profile_name_label">Nombre</string>
     <string name="users_profile_email_label">Correo electrónico</string>
-    <string name="users_profile_email_read_only">El correo no se puede cambiar desde esta versión.</string>
+    <string name="users_profile_email_read_only">El correo no se modifica. Para usar otro, se necesita una cuenta distinta.</string>
     <string name="users_profile_name_required">Escribe un nombre para continuar.</string>
     <string name="users_save_profile">Guardar nombre</string>
     <string name="users_saving_profile">Guardando…</string>
