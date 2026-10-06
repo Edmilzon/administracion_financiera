@@ -1,8 +1,14 @@
 package com.moonspace.adminfinanciera.feature.auth.presentation
 
 import android.util.Patterns
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,12 +16,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,21 +32,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
 import com.moonspace.adminfinanciera.R
 import com.moonspace.adminfinanciera.core.ui.components.FinanceButton
-import com.moonspace.adminfinanciera.core.ui.components.FinanceCard
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusBanner
 import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
 import com.moonspace.adminfinanciera.core.ui.forms.FinancePasswordField
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
+import com.moonspace.adminfinanciera.feature.auth.presentation.components.LoginGlassBackdrop
+import com.moonspace.adminfinanciera.feature.auth.presentation.components.LoginGlassPanel
 
 @Composable
 fun LoginScreen(
@@ -70,44 +84,74 @@ fun LoginScreen(
             else onSignIn(email.trim(), password)
         }
     }
+    val colorScheme = MaterialTheme.colorScheme
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colorScheme.background)
     ) {
+        LoginGlassBackdrop(modifier = Modifier.fillMaxSize())
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .align(Alignment.Center)
+                .widthIn(max = 520.dp)
+                .fillMaxWidth()
                 .safeDrawingPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = FinanceSpacing.ScreenHorizontal, vertical = FinanceSpacing.Large),
+                .padding(horizontal = FinanceSpacing.Large, vertical = FinanceSpacing.XLarge),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = stringResource(R.string.login_eyebrow),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.height(FinanceSpacing.Small))
-            Text(
-                text = stringResource(if (creatingAccount) R.string.auth_create_title else R.string.login_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(FinanceSpacing.XSmall))
-            Text(
-                text = stringResource(if (creatingAccount) R.string.auth_create_description else R.string.login_description),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(FinanceSpacing.Large))
+            LoginGlassPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.finance_launcher_artwork),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        colorScheme.onSurface.copy(alpha = GLASS_BORDER_ALPHA)
+                                    ),
+                                    RoundedCornerShape(18.dp)
+                                )
+                        )
+                        Text(
+                            text = stringResource(R.string.login_eyebrow),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colorScheme.primary
+                        )
+                    }
 
-            FinanceCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(FinanceSpacing.Medium),
-                    verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
-                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)) {
+                        Text(
+                            text = stringResource(
+                                if (creatingAccount) R.string.auth_create_title else R.string.login_title
+                            ),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(
+                                if (creatingAccount) R.string.auth_create_description
+                                else R.string.login_description
+                            ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(FinanceSpacing.XSmall))
+
                     FinanceTextField(
                         value = email,
                         onValueChange = {
@@ -157,7 +201,9 @@ fun LoginScreen(
                             modifier = Modifier.focusRequester(confirmationFocusRequester),
                             enabled = !isSubmitting,
                             isError = passwordConfirmationTouched && passwordConfirmation.isNotEmpty() && !passwordsMatch,
-                            supportingText = if (passwordConfirmationTouched && passwordConfirmation.isNotEmpty() && !passwordsMatch) {
+                            supportingText = if (
+                                passwordConfirmationTouched && passwordConfirmation.isNotEmpty() && !passwordsMatch
+                            ) {
                                 stringResource(R.string.auth_password_mismatch)
                             } else null,
                             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
@@ -165,11 +211,15 @@ fun LoginScreen(
                         )
                     }
 
+                    if (noticeMessage != null) {
+                        FinanceStatusBanner(message = noticeMessage, tone = FinanceStatusTone.Info)
+                    }
+
                     if (errorMessage != null) {
                         Text(
                             text = errorMessage,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error
+                            color = colorScheme.error
                         )
                     }
 
@@ -183,33 +233,25 @@ fun LoginScreen(
                         isLoading = isSubmitting,
                         loadingLabel = stringResource(R.string.login_submitting)
                     )
+
+                    TextButton(
+                        onClick = {
+                            creatingAccount = !creatingAccount
+                            password = ""
+                            passwordConfirmation = ""
+                            passwordConfirmationTouched = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isSubmitting
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (creatingAccount) R.string.auth_switch_to_sign_in
+                                else R.string.auth_switch_to_create
+                            )
+                        )
+                    }
                 }
-            }
-
-            if (noticeMessage != null) {
-                Spacer(Modifier.height(FinanceSpacing.Medium))
-                FinanceStatusBanner(
-                    message = noticeMessage,
-                    tone = FinanceStatusTone.Info
-                )
-            }
-
-            Spacer(Modifier.height(FinanceSpacing.Small))
-            TextButton(
-                onClick = {
-                    creatingAccount = !creatingAccount
-                    password = ""
-                    passwordConfirmation = ""
-                    passwordConfirmationTouched = false
-                },
-                enabled = !isSubmitting
-            ) {
-                Text(
-                    text = stringResource(
-                        if (creatingAccount) R.string.auth_switch_to_sign_in
-                        else R.string.auth_switch_to_create
-                    )
-                )
             }
         }
     }
