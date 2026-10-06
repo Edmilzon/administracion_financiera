@@ -3,8 +3,11 @@ package com.moonspace.adminfinanciera.feature.reports.data
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import androidx.compose.ui.graphics.toArgb
+import com.moonspace.adminfinanciera.core.ui.theme.FinanceColors
 import com.moonspace.adminfinanciera.feature.reports.domain.FinanceReport
 import com.moonspace.adminfinanciera.feature.reports.domain.FinanceReportBreakdown
 import com.moonspace.adminfinanciera.feature.reports.domain.FinanceReportExporter
@@ -70,7 +73,7 @@ class FinanceReportDocumentGenerator(private val cacheDirectory: File) : Finance
             zip.writeEntry("_rels/.rels", PACKAGE_RELATIONSHIPS_XML)
             zip.writeEntry("xl/workbook.xml", workbookXml())
             zip.writeEntry("xl/_rels/workbook.xml.rels", WORKBOOK_RELATIONSHIPS_XML)
-            zip.writeEntry("xl/styles.xml", STYLES_XML)
+            zip.writeEntry("xl/styles.xml", stylesXml())
             zip.writeEntry("xl/worksheets/sheet1.xml", summarySheet(report))
             zip.writeEntry("xl/worksheets/sheet2.xml", transactionsSheet(report))
         }
@@ -78,78 +81,132 @@ class FinanceReportDocumentGenerator(private val cacheDirectory: File) : Finance
 
     private fun summarySheet(report: FinanceReport): String {
         val rows = mutableListOf<List<WorkbookCell>>()
-        rows += listOf(WorkbookCell.Text("Informe financiero", WorkbookCell.HEADER))
-        rows += listOf(WorkbookCell.Text("Período"), WorkbookCell.Text("${report.filters.startOn} – ${report.filters.endOn}"))
-        rows += listOf(WorkbookCell.Text("Alcance"), WorkbookCell.Text(report.scopeLabel))
-        rows += listOf(WorkbookCell.Text("Tipo"), WorkbookCell.Text(report.filters.kind.label()))
-        rows += listOf(WorkbookCell.Text("Categoría"), WorkbookCell.Text(report.selectedCategoryLabel()))
-        rows += listOf(WorkbookCell.Text("Persona"), WorkbookCell.Text(report.selectedMemberLabel()))
+        val mergedRanges = mutableListOf("A1:E1")
+        fun addSection(title: String) {
+            val rowNumber = rows.size + 1
+            rows += listOf(WorkbookCell.Text(title, WorkbookCell.SECTION))
+            mergedRanges += "A$rowNumber:E$rowNumber"
+        }
+
+        rows += listOf(WorkbookCell.Text("Nexo Finanzas · Informe financiero", WorkbookCell.TITLE))
+        rows += listOf(WorkbookCell.Text("Período", WorkbookCell.META_LABEL), WorkbookCell.Text("${formatReportDate(report.filters.startOn)} – ${formatReportDate(report.filters.endOn)}", WorkbookCell.META_VALUE))
+        rows += listOf(WorkbookCell.Text("Alcance", WorkbookCell.META_LABEL), WorkbookCell.Text(report.scopeLabel, WorkbookCell.META_VALUE))
+        rows += listOf(WorkbookCell.Text("Tipo", WorkbookCell.META_LABEL), WorkbookCell.Text(report.filters.kind.label(), WorkbookCell.META_VALUE))
+        rows += listOf(WorkbookCell.Text("Categoría", WorkbookCell.META_LABEL), WorkbookCell.Text(report.selectedCategoryLabel(), WorkbookCell.META_VALUE))
+        rows += listOf(WorkbookCell.Text("Persona", WorkbookCell.META_LABEL), WorkbookCell.Text(report.selectedMemberLabel(), WorkbookCell.META_VALUE))
         rows.add(emptyList())
+        addSection("Resumen")
         rows += listOf(
-            WorkbookCell.Text("Resumen", WorkbookCell.HEADER),
-            WorkbookCell.Text("Importe (BOB)", WorkbookCell.HEADER),
-            WorkbookCell.Text("Movimientos", WorkbookCell.HEADER)
+            WorkbookCell.Text("Concepto", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Importe (BOB)", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Movimientos", WorkbookCell.TABLE_HEADER)
         )
-        rows += listOf(WorkbookCell.Text("Ingresos"), WorkbookCell.Number(report.total.incomeCentavos.toMajorUnits()), WorkbookCell.Number(report.rows.count { it.kind == TransactionKind.Income }))
-        rows += listOf(WorkbookCell.Text("Gastos"), WorkbookCell.Number(report.total.expenseCentavos.toMajorUnits()), WorkbookCell.Number(report.rows.count { it.kind == TransactionKind.Expense }))
-        rows += listOf(WorkbookCell.Text("Diferencia"), WorkbookCell.Number(report.total.netCentavos.toMajorUnits()), WorkbookCell.Number(report.total.transactionCount))
+        rows += listOf(WorkbookCell.Text("Ingresos", WorkbookCell.INCOME_LABEL), WorkbookCell.Number(report.total.incomeCentavos.toMajorUnits(), WorkbookCell.INCOME), WorkbookCell.Number(report.rows.count { it.kind == TransactionKind.Income }))
+        rows += listOf(WorkbookCell.Text("Gastos", WorkbookCell.EXPENSE_LABEL), WorkbookCell.Number(report.total.expenseCentavos.toMajorUnits(), WorkbookCell.EXPENSE), WorkbookCell.Number(report.rows.count { it.kind == TransactionKind.Expense }))
+        val netStyle = when (report.total.netCentavos.signum()) {
+            -1 -> WorkbookCell.EXPENSE
+            1 -> WorkbookCell.INCOME
+            else -> WorkbookCell.NUMBER
+        }
+        val netLabelStyle = when (report.total.netCentavos.signum()) {
+            -1 -> WorkbookCell.EXPENSE_LABEL
+            1 -> WorkbookCell.INCOME_LABEL
+            else -> WorkbookCell.DEFAULT
+        }
+        rows += listOf(WorkbookCell.Text("Diferencia", netLabelStyle), WorkbookCell.Number(report.total.netCentavos.toMajorUnits(), netStyle), WorkbookCell.Number(report.total.transactionCount))
         rows.add(emptyList())
+        addSection("Por categoría")
         rows += listOf(
-            WorkbookCell.Text("Por categoría", WorkbookCell.HEADER),
-            WorkbookCell.Text("Ingresos (BOB)", WorkbookCell.HEADER),
-            WorkbookCell.Text("Gastos (BOB)", WorkbookCell.HEADER),
-            WorkbookCell.Text("Diferencia (BOB)", WorkbookCell.HEADER),
-            WorkbookCell.Text("Movimientos", WorkbookCell.HEADER)
+            WorkbookCell.Text("Categoría", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Ingresos (BOB)", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Gastos (BOB)", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Diferencia (BOB)", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Movimientos", WorkbookCell.TABLE_HEADER)
         )
         report.categoryBreakdown.forEach { rows += it.asWorkbookRow() }
         if (report.memberBreakdown.isNotEmpty()) {
             rows.add(emptyList())
+            addSection("Por persona")
             rows += listOf(
-                WorkbookCell.Text("Por persona", WorkbookCell.HEADER),
-                WorkbookCell.Text("Ingresos (BOB)", WorkbookCell.HEADER),
-                WorkbookCell.Text("Gastos (BOB)", WorkbookCell.HEADER),
-                WorkbookCell.Text("Diferencia (BOB)", WorkbookCell.HEADER),
-                WorkbookCell.Text("Movimientos", WorkbookCell.HEADER)
+                WorkbookCell.Text("Integrante", WorkbookCell.TABLE_HEADER),
+                WorkbookCell.Text("Ingresos (BOB)", WorkbookCell.TABLE_HEADER),
+                WorkbookCell.Text("Gastos (BOB)", WorkbookCell.TABLE_HEADER),
+                WorkbookCell.Text("Diferencia (BOB)", WorkbookCell.TABLE_HEADER),
+                WorkbookCell.Text("Movimientos", WorkbookCell.TABLE_HEADER)
             )
             report.memberBreakdown.forEach { rows += it.asWorkbookRow() }
         }
-        return worksheetXml(rows, listOf(32, 20, 20, 20, 18))
+        return worksheetXml(
+            rows,
+            columnWidths = listOf(32, 20, 20, 20, 18),
+            mergedRanges = mergedRanges,
+            frozenRows = 1
+        )
     }
 
     private fun transactionsSheet(report: FinanceReport): String {
         val rows = mutableListOf<List<WorkbookCell>>()
         rows += listOf(
-            WorkbookCell.Text("Fecha", WorkbookCell.HEADER),
-            WorkbookCell.Text("Tipo", WorkbookCell.HEADER),
-            WorkbookCell.Text("Categoría", WorkbookCell.HEADER),
-            WorkbookCell.Text("Persona", WorkbookCell.HEADER),
-            WorkbookCell.Text("Descripción", WorkbookCell.HEADER),
-            WorkbookCell.Text("Importe (BOB)", WorkbookCell.HEADER)
+            WorkbookCell.Text("Fecha", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Tipo", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Categoría", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Persona", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Descripción", WorkbookCell.TABLE_HEADER),
+            WorkbookCell.Text("Importe (BOB)", WorkbookCell.TABLE_HEADER)
         )
         report.rows.forEach { row ->
             rows += listOf(
-                WorkbookCell.Text(row.occurredOn),
-                WorkbookCell.Text(row.kind.label()),
+                WorkbookCell.Text(formatReportDate(row.occurredOn)),
+                WorkbookCell.Text(
+                    row.kind.label(),
+                    if (row.kind == TransactionKind.Income) WorkbookCell.INCOME_LABEL else WorkbookCell.EXPENSE_LABEL
+                ),
                 WorkbookCell.Text(row.categoryName),
                 WorkbookCell.Text(row.memberLabel),
                 WorkbookCell.Text(row.description.orEmpty()),
-                WorkbookCell.Number(row.amountCentavos.toMajorUnits())
+                WorkbookCell.Number(
+                    row.amountCentavos.toMajorUnits(),
+                    if (row.kind == TransactionKind.Income) WorkbookCell.INCOME else WorkbookCell.EXPENSE
+                )
             )
         }
-        return worksheetXml(rows, listOf(16, 14, 24, 32, 48, 18))
+        return worksheetXml(
+            rows,
+            columnWidths = listOf(16, 14, 24, 32, 48, 18),
+            autoFilter = "A1:F${report.rows.size + 1}",
+            frozenRows = 1
+        )
     }
 
     private fun FinanceReportBreakdown.asWorkbookRow(): List<WorkbookCell> = listOf(
         WorkbookCell.Text(label),
-        WorkbookCell.Number(incomeCentavos.toMajorUnits()),
-        WorkbookCell.Number(expenseCentavos.toMajorUnits()),
-        WorkbookCell.Number(netCentavos.toMajorUnits()),
+        WorkbookCell.Number(incomeCentavos.toMajorUnits(), WorkbookCell.INCOME),
+        WorkbookCell.Number(expenseCentavos.toMajorUnits(), WorkbookCell.EXPENSE),
+        WorkbookCell.Number(
+            netCentavos.toMajorUnits(),
+            when (netCentavos.signum()) {
+                -1 -> WorkbookCell.EXPENSE
+                1 -> WorkbookCell.INCOME
+                else -> WorkbookCell.NUMBER
+            }
+        ),
         WorkbookCell.Number(transactionCount)
     )
 
-    private fun worksheetXml(rows: List<List<WorkbookCell>>, columnWidths: List<Int>): String = buildString {
+    private fun worksheetXml(
+        rows: List<List<WorkbookCell>>,
+        columnWidths: List<Int>,
+        mergedRanges: List<String> = emptyList(),
+        autoFilter: String? = null,
+        frozenRows: Int = 0
+    ): String = buildString {
         append(XML_DECLARATION)
         append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">")
+        append("<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"0\">")
+        if (frozenRows > 0) {
+            append("<pane ySplit=\"$frozenRows\" topLeftCell=\"A${frozenRows + 1}\" activePane=\"bottomLeft\" state=\"frozen\"/>")
+        }
+        append("</sheetView></sheetViews>")
         append("<cols>")
         columnWidths.forEachIndexed { index, width ->
             append("<col min=\"${index + 1}\" max=\"${index + 1}\" width=\"$width\" customWidth=\"1\"/>")
@@ -158,7 +215,11 @@ class FinanceReportDocumentGenerator(private val cacheDirectory: File) : Finance
         rows.forEachIndexed { rowIndex, cells ->
             if (cells.isNotEmpty()) {
                 val rowNumber = rowIndex + 1
-                append("<row r=\"$rowNumber\">")
+                if (rowIndex == 0) {
+                    append("<row r=\"$rowNumber\" ht=\"30\" customHeight=\"1\">")
+                } else {
+                    append("<row r=\"$rowNumber\">")
+                }
                 cells.forEachIndexed { columnIndex, cell ->
                     val reference = "${columnName(columnIndex)}$rowNumber"
                     when (cell) {
@@ -177,7 +238,14 @@ class FinanceReportDocumentGenerator(private val cacheDirectory: File) : Finance
                 append("</row>")
             }
         }
-        append("</sheetData></worksheet>")
+        append("</sheetData>")
+        autoFilter?.let { append("<autoFilter ref=\"$it\"/>") }
+        if (mergedRanges.isNotEmpty()) {
+            append("<mergeCells count=\"${mergedRanges.size}\">")
+            mergedRanges.forEach { range -> append("<mergeCell ref=\"$range\"/>") }
+            append("</mergeCells>")
+        }
+        append("</worksheet>")
     }
 
     private fun ZipOutputStream.writeEntry(path: String, contents: String) {
@@ -236,15 +304,47 @@ class FinanceReportDocumentGenerator(private val cacheDirectory: File) : Finance
               <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
             </Relationships>
         """.trimIndent()
-        val STYLES_XML = """
+        fun stylesXml(): String = """
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-              <numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00"/></numFmts>
-              <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-              <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
-              <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+              <numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00 &quot;BOB&quot;;#,##0.00 &quot;BOB&quot;;0.00 &quot;BOB&quot;"/></numFmts>
+              <fonts count="7">
+                <font><sz val="10"/><color rgb="FF${FinanceColors.OnSurface.toExcelRgb()}"/><name val="Aptos"/></font>
+                <font><b/><sz val="18"/><color rgb="FF${FinanceColors.OnPrimary.toExcelRgb()}"/><name val="Aptos Display"/></font>
+                <font><b/><sz val="10"/><color rgb="FF${FinanceColors.Primary.toExcelRgb()}"/><name val="Aptos"/></font>
+                <font><b/><sz val="10"/><color rgb="FF${FinanceColors.Success.toExcelRgb()}"/><name val="Aptos"/></font>
+                <font><b/><sz val="10"/><color rgb="FF${FinanceColors.Expense.toExcelRgb()}"/><name val="Aptos"/></font>
+                <font><b/><sz val="10"/><color rgb="FF${FinanceColors.OnPrimary.toExcelRgb()}"/><name val="Aptos"/></font>
+                <font><b/><sz val="10"/><color rgb="FF${FinanceColors.OnSurface.toExcelRgb()}"/><name val="Aptos"/></font>
+              </fonts>
+              <fills count="7">
+                <fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FF${FinanceColors.Primary.toExcelRgb()}"/><bgColor indexed="64"/></patternFill></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FF${FinanceColors.Secondary.toExcelRgb()}"/><bgColor indexed="64"/></patternFill></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FF${FinanceColors.SurfaceVariant.toExcelRgb()}"/><bgColor indexed="64"/></patternFill></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FF${FinanceColors.SuccessContainer.toExcelRgb()}"/><bgColor indexed="64"/></patternFill></fill>
+                <fill><patternFill patternType="solid"><fgColor rgb="FF${FinanceColors.ExpenseContainer.toExcelRgb()}"/><bgColor indexed="64"/></patternFill></fill>
+              </fills>
+              <borders count="2">
+                <border><left/><right/><top/><bottom/><diagonal/></border>
+                <border><left/><right/><top/><bottom style="thin"><color rgb="FF${FinanceColors.OutlineVariant.toExcelRgb()}"/></bottom><diagonal/></border>
+              </borders>
               <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-              <cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>
+              <cellXfs count="13">
+                <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+                <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>
+                <xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>
+                <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
+                <xf numFmtId="0" fontId="5" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>
+                <xf numFmtId="0" fontId="5" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>
+                <xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+                <xf numFmtId="164" fontId="3" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+                <xf numFmtId="164" fontId="4" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+                <xf numFmtId="164" fontId="2" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+                <xf numFmtId="0" fontId="3" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+                <xf numFmtId="0" fontId="4" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+                <xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+              </cellXfs>
               <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
             </styleSheet>
         """.trimIndent()
@@ -265,8 +365,18 @@ private sealed interface WorkbookCell {
 
     companion object {
         const val DEFAULT = 0
-        const val HEADER = 1
-        const val NUMBER = 2
+        const val TITLE = 1
+        const val META_LABEL = 2
+        const val META_VALUE = 3
+        const val SECTION = 4
+        const val TABLE_HEADER = 5
+        const val NUMBER = 6
+        const val INCOME = 7
+        const val EXPENSE = 8
+        const val NET = 9
+        const val INCOME_LABEL = 10
+        const val EXPENSE_LABEL = 11
+        const val NET_LABEL = 12
     }
 }
 
@@ -279,34 +389,42 @@ private class FinanceReportPdfWriter(
     private val margin = 38f
     private val contentWidth = pageWidth - margin * 2
     private val bottomLimit = pageHeight - 48f
-    private val headingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(25, 38, 33)
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        textSize = 21f
-    }
-    private val sectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(40, 59, 51)
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        textSize = 12f
-    }
-    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(47, 56, 52)
-        textSize = 9f
-    }
-    private val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(80, 89, 84)
-        textSize = 8f
-    }
-    private val boldPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(35, 45, 40)
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        textSize = 9f
+    private val primary = FinanceColors.Primary.toArgb()
+    private val primaryContainer = FinanceColors.PrimaryContainer.toArgb()
+    private val darkText = FinanceColors.OnSurface.toArgb()
+    private val mutedText = FinanceColors.OnSurfaceVariant.toArgb()
+    private val borderColor = FinanceColors.OutlineVariant.toArgb()
+    private val headingPaint = textPaint(Color.WHITE, 23f, bold = true)
+    private val brandPaint = textPaint(Color.WHITE, 8f, bold = true)
+    private val logoPaint = textPaint(FinanceColors.OnPrimaryContainer.toArgb(), 11f, bold = true)
+    private val headerMetaPaint = textPaint(Color.WHITE, 9f)
+    private val sourcePaint = textPaint(FinanceColors.PrimaryContainer.toArgb(), 7.5f, bold = true)
+    private val sectionPaint = textPaint(Color.WHITE, 10f, bold = true)
+    private val bodyPaint = textPaint(darkText, 9f)
+    private val smallPaint = textPaint(mutedText, 8f)
+    private val boldPaint = textPaint(darkText, 9f, bold = true)
+    private val incomePaint = textPaint(FinanceColors.Success.toArgb(), 8f, bold = true)
+    private val expensePaint = textPaint(FinanceColors.Expense.toArgb(), 8f, bold = true)
+    private val whiteSmallPaint = textPaint(Color.WHITE, 8f, bold = true)
+    private val primaryFillPaint = fillPaint(primary)
+    private val secondaryFillPaint = fillPaint(FinanceColors.Secondary.toArgb())
+    private val primaryContainerFillPaint = fillPaint(primaryContainer)
+    private val incomeFillPaint = fillPaint(FinanceColors.SuccessContainer.toArgb())
+    private val expenseFillPaint = fillPaint(FinanceColors.ExpenseContainer.toArgb())
+    private val surfaceVariantFillPaint = fillPaint(FinanceColors.SurfaceVariant.toArgb())
+    private val backgroundFillPaint = fillPaint(FinanceColors.Background.toArgb())
+    private val whiteFillPaint = fillPaint(Color.WHITE)
+    private val rulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = borderColor
+        strokeWidth = 0.7f
     }
     private var page: PdfDocument.Page? = null
     private var canvas: Canvas? = null
     private var y = 0f
     private var pageNumber = 0
     private var inMovementTable = false
+    private var breakdownRowIndex = 0
+    private var movementRowIndex = 0
 
     fun write() {
         beginPage(isContinuation = false)
@@ -318,26 +436,72 @@ private class FinanceReportPdfWriter(
     }
 
     private fun drawTitle() {
-        drawText("Informe financiero", margin, y, headingPaint)
-        y += 30f
-        drawText("Período: ${report.filters.startOn} – ${report.filters.endOn}", margin, y, bodyPaint)
-        y += 15f
-        drawText("Alcance: ${report.scopeLabel}", margin, y, bodyPaint)
-        y += 15f
-        drawText("Filtros: ${report.filters.kind.label()} · ${report.selectedCategoryLabel()} · ${report.selectedMemberLabel()}", margin, y, smallPaint)
-        y += 14f
-        drawText("Moneda: BOB", margin, y, smallPaint)
-        y += 17f
-        drawRule()
-        y += 12f
+        val scopeLines = wrapText("Alcance: ${report.scopeLabel}", headerMetaPaint, contentWidth)
+        val filterText = "Filtros: ${report.filters.kind.label()} · ${report.selectedCategoryLabel()} · ${report.selectedMemberLabel()}"
+        val filterLines = wrapText(filterText, headerMetaPaint, contentWidth)
+        val scopeY = 116f
+        val filtersY = scopeY + scopeLines.size * 12f + 2f
+        val sourceY = filtersY + filterLines.size * 12f + 13f
+        val headerBottom = sourceY + 13f
+
+        canvas?.drawRect(0f, 0f, pageWidth.toFloat(), headerBottom, primaryFillPaint)
+        canvas?.drawRect(0f, 0f, pageWidth.toFloat(), 6f, secondaryFillPaint)
+        canvas?.drawRoundRect(RectF(margin, 22f, margin + 35f, 57f), 9f, 9f, primaryContainerFillPaint)
+        drawText("NF", margin + 8f, 44f, logoPaint)
+        drawText("NEXO FINANZAS", margin + 45f, 43f, brandPaint)
+        drawText("Informe financiero", margin, 83f, headingPaint)
+        drawText(
+            "Período: ${formatReportDate(report.filters.startOn)} – ${formatReportDate(report.filters.endOn)}",
+            margin,
+            101f,
+            headerMetaPaint
+        )
+        scopeLines.forEachIndexed { index, line -> drawText(line, margin, scopeY + index * 12f, headerMetaPaint) }
+        filterLines.forEachIndexed { index, line -> drawText(line, margin, filtersY + index * 12f, headerMetaPaint) }
+        drawText("Datos disponibles en este dispositivo · Moneda BOB", margin, sourceY, sourcePaint)
+        y = headerBottom + 18f
     }
 
     private fun drawSummary() {
         drawSection("Resumen")
-        drawSummaryLine("Ingresos", report.total.incomeCentavos.toReportAmount())
-        drawSummaryLine("Gastos", report.total.expenseCentavos.toReportAmount())
-        drawSummaryLine("Diferencia", report.total.netCentavos.toReportAmount())
-        drawSummaryLine("Movimientos", report.total.transactionCount.toString())
+        val gap = 8f
+        val cardWidth = (contentWidth - gap * 2f) / 3f
+        drawMetricCard(
+            x = margin,
+            width = cardWidth,
+            label = "Ingresos",
+            value = report.total.incomeCentavos.toReportAmount(),
+            textPaint = incomePaint,
+            fillPaint = incomeFillPaint
+        )
+        drawMetricCard(
+            x = margin + cardWidth + gap,
+            width = cardWidth,
+            label = "Gastos",
+            value = report.total.expenseCentavos.toReportAmount(),
+            textPaint = expensePaint,
+            fillPaint = expenseFillPaint
+        )
+        val netPaint = when (report.total.netCentavos.signum()) {
+            -1 -> expensePaint
+            1 -> incomePaint
+            else -> boldPaint
+        }
+        val netFill = when (report.total.netCentavos.signum()) {
+            -1 -> expenseFillPaint
+            1 -> incomeFillPaint
+            else -> surfaceVariantFillPaint
+        }
+        drawMetricCard(
+            x = margin + (cardWidth + gap) * 2f,
+            width = cardWidth,
+            label = "Diferencia",
+            value = report.total.netCentavos.abs().toReportAmount(),
+            textPaint = netPaint,
+            fillPaint = netFill
+        )
+        y += 57f
+        drawSummaryLine("Movimientos registrados", report.total.transactionCount.toString())
     }
 
     private fun drawBreakdowns() {
@@ -363,18 +527,17 @@ private class FinanceReportPdfWriter(
 
     private fun drawSummaryLine(label: String, value: String) {
         ensureSpace(16f)
-        drawText(label, margin, y, bodyPaint)
+        drawText(label, margin + 4f, y, bodyPaint)
         drawText(value, pageWidth - margin - boldPaint.measureText(value), y, boldPaint)
-        y += 15f
+        y += 17f
     }
 
     private fun drawSection(title: String) {
-        ensureSpace(28f)
-        y += 7f
-        drawText(title, margin, y, sectionPaint)
-        y += 15f
-        drawRule()
-        y += 9f
+        ensureSpace(32f)
+        val top = y - 12f
+        canvas?.drawRoundRect(RectF(margin, top, pageWidth - margin, top + 23f), 6f, 6f, primaryFillPaint)
+        drawText(title, margin + 10f, y + 3f, sectionPaint)
+        y += 24f
     }
 
     private fun drawBodyLine(value: String) {
@@ -384,53 +547,106 @@ private class FinanceReportPdfWriter(
     }
 
     private fun drawBreakdownLine(item: FinanceReportBreakdown) {
-        val text = "${item.label}  ·  Ing. ${item.incomeCentavos.toReportAmount()}  ·  Gastos ${item.expenseCentavos.toReportAmount()}  ·  Dif. ${item.netCentavos.toReportAmount()}  ·  ${item.transactionCount} mov."
-        ensureSpace(14f)
-        drawText(ellipsize(text, bodyPaint, contentWidth), margin, y, bodyPaint)
-        y += 13f
+        ensureSpace(43f)
+        val top = y - 12f
+        canvas?.drawRoundRect(
+            RectF(margin, top, pageWidth - margin, top + 39f),
+            5f,
+            5f,
+            if (breakdownRowIndex++ % 2 == 0) backgroundFillPaint else surfaceVariantFillPaint
+        )
+        val countLabel = "${item.transactionCount} mov."
+        val labelWidth = contentWidth - boldPaint.measureText(countLabel) - 24f
+        drawText(ellipsize(item.label, boldPaint, labelWidth), margin + 9f, y + 1f, boldPaint)
+        drawText(countLabel, pageWidth - margin - 9f - smallPaint.measureText(countLabel), y + 1f, smallPaint)
+
+        val metricWidth = contentWidth / 3f
+        val incomeText = "Ing. ${item.incomeCentavos.toReportAmount()}"
+        val expenseText = "Gasto ${item.expenseCentavos.toReportAmount()}"
+        val netText = "Dif. ${item.netCentavos.abs().toReportAmount()}"
+        val netPaint = when (item.netCentavos.signum()) {
+            -1 -> expensePaint
+            1 -> incomePaint
+            else -> boldPaint
+        }
+        drawText(ellipsize(incomeText, incomePaint, metricWidth - 12f), margin + 9f, y + 19f, incomePaint)
+        drawText(ellipsize(expenseText, expensePaint, metricWidth - 12f), margin + metricWidth + 4f, y + 19f, expensePaint)
+        drawText(ellipsize(netText, netPaint, metricWidth - 12f), margin + metricWidth * 2f, y + 19f, netPaint)
+        y += 45f
     }
 
     private fun drawMovementTableHeader() {
-        ensureSpace(23f)
+        ensureSpace(27f)
         val widths = movementColumnWidths()
         val labels = listOf("Fecha", "Tipo", "Categoría", "Persona", "Importe BOB")
+        canvas?.drawRoundRect(
+            RectF(margin, y - 13f, pageWidth - margin, y + 7f),
+            4f,
+            4f,
+            secondaryFillPaint
+        )
         var x = margin
         labels.forEachIndexed { index, label ->
-            drawText(ellipsize(label, boldPaint, widths[index] - 5f), x, y, boldPaint)
+            drawText(ellipsize(label, whiteSmallPaint, widths[index] - 5f), x + 4f, y, whiteSmallPaint)
             x += widths[index]
         }
-        y += 5f
-        drawRule()
-        y += 12f
+        y += 20f
     }
 
     private fun drawTransactionRow(row: FinanceReportRow) {
-        ensureSpace(22f)
+        val descriptionLines = row.description
+            ?.takeIf(String::isNotBlank)
+            ?.let { wrapText("Descripción: $it", bodyPaint, contentWidth - 18f) }
+            .orEmpty()
+        val rowHeight = 25f + descriptionLines.size * 11f
+        ensureSpace(rowHeight)
         val widths = movementColumnWidths()
+        val rowTop = y - 11f
+        val rowBottom = y + rowHeight - 13f
+        canvas?.drawRect(
+            margin,
+            rowTop,
+            pageWidth - margin,
+            rowBottom,
+            if (movementRowIndex++ % 2 == 0) backgroundFillPaint else whiteFillPaint
+        )
         val values = listOf(
             formatReportDate(row.occurredOn),
             row.kind.label(),
             row.categoryName,
             row.memberLabel
         )
+        val typePaint = if (row.kind == TransactionKind.Income) incomePaint else expensePaint
         var x = margin
         values.forEachIndexed { index, value ->
-            drawText(ellipsize(value, smallPaint, widths[index] - 5f), x, y, smallPaint)
+            val paint = if (index == 1) typePaint else smallPaint
+            drawText(ellipsize(value, paint, widths[index] - 8f), x + 4f, y, paint)
             x += widths[index]
         }
         val amount = row.amountCentavos.toReportAmount()
-        drawText(ellipsize(amount, boldPaint, widths.last() - 4f), x, y, boldPaint)
-        y += 13f
-        row.description?.takeIf(String::isNotBlank)?.let { description ->
-            wrapText("Descripción: $description", bodyPaint, contentWidth - 8f).forEach { line ->
-                ensureSpace(12f)
-                drawText(line, margin + 5f, y, bodyPaint)
-                y += 11f
-            }
+        drawText(ellipsize(amount, typePaint, widths.last() - 8f), x + 3f, y, typePaint)
+        y += 12f
+        descriptionLines.forEach { line ->
+            drawText(ellipsize(line, bodyPaint, contentWidth - 14f), margin + 8f, y, bodyPaint)
+            y += 11f
         }
-        y += 4f
-        drawRule()
-        y += 8f
+        y += 9f
+        canvas?.drawLine(margin, y - 5f, pageWidth - margin, y - 5f, rulePaint)
+        y += 3f
+    }
+
+    private fun drawMetricCard(
+        x: Float,
+        width: Float,
+        label: String,
+        value: String,
+        textPaint: Paint,
+        fillPaint: Paint
+    ) {
+        val top = y - 10f
+        canvas?.drawRoundRect(RectF(x, top, x + width, top + 51f), 7f, 7f, fillPaint)
+        drawText(label, x + 9f, y + 4f, smallPaint)
+        drawText(ellipsize(value, textPaint, width - 18f), x + 9f, y + 26f, textPaint)
     }
 
     private fun movementColumnWidths(): List<Float> {
@@ -450,23 +666,27 @@ private class FinanceReportPdfWriter(
         val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
         page = document.startPage(pageInfo)
         canvas = page?.canvas
-        y = 44f
+        canvas?.drawColor(Color.WHITE)
         if (isContinuation) {
-            drawText("Informe financiero · ${report.filters.startOn} – ${report.filters.endOn}", margin, y, boldPaint)
-            y += 20f
-            drawRule()
-            y += 12f
+            canvas?.drawRect(0f, 0f, pageWidth.toFloat(), 61f, primaryFillPaint)
+            canvas?.drawRect(0f, 0f, pageWidth.toFloat(), 5f, secondaryFillPaint)
+            drawText("NEXO FINANZAS · INFORME FINANCIERO", margin, 27f, brandPaint)
+            drawText(
+                "Período: ${formatReportDate(report.filters.startOn)} – ${formatReportDate(report.filters.endOn)}",
+                margin,
+                47f,
+                headerMetaPaint
+            )
+            y = 82f
+        } else {
+            y = 44f
         }
     }
 
     private fun finishPage() {
         val currentPage = page ?: return
-        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(185, 194, 188)
-            strokeWidth = 0.7f
-        }
-        currentPage.canvas.drawLine(margin, pageHeight - 37f, pageWidth - margin, pageHeight - 37f, linePaint)
-        val footer = "Página $pageNumber"
+        currentPage.canvas.drawLine(margin, pageHeight - 37f, pageWidth - margin, pageHeight - 37f, rulePaint)
+        val footer = "Nexo Finanzas  ·  Página $pageNumber"
         val footerPaint = smallPaint
         currentPage.canvas.drawText(
             footer,
@@ -480,10 +700,6 @@ private class FinanceReportPdfWriter(
     }
 
     private fun drawRule() {
-        val rulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(211, 218, 213)
-            strokeWidth = 0.6f
-        }
         canvas?.drawLine(margin, y, pageWidth - margin, y, rulePaint)
     }
 
@@ -514,6 +730,18 @@ private class FinanceReportPdfWriter(
         if (current.isNotEmpty()) output += current.toString()
         return output.ifEmpty { listOf("") }
     }
+
+    private fun textPaint(color: Int, size: Float, bold: Boolean = false): Paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
+            textSize = size
+        }
+
+    private fun fillPaint(color: Int): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        style = Paint.Style.FILL
+    }
 }
 
 private fun FinanceReport.selectedCategoryLabel(): String =
@@ -521,6 +749,9 @@ private fun FinanceReport.selectedCategoryLabel(): String =
 
 private fun FinanceReport.selectedMemberLabel(): String =
     memberOptions.firstOrNull { it.value == filters.memberId }?.label ?: "Todo el espacio"
+
+private fun androidx.compose.ui.graphics.Color.toExcelRgb(): String =
+    "%06X".format(Locale.ROOT, toArgb() and 0x00FFFFFF)
 
 private fun ReportKindFilter.label(): String = when (this) {
     ReportKindFilter.All -> "Todos los tipos"
