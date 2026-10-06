@@ -20,6 +20,7 @@ fun FinanceTextField(
     enabled: Boolean = true,
     readOnly: Boolean = false,
     singleLine: Boolean = true,
+    placeholder: String? = null,
     isError: Boolean = false,
     supportingText: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -38,6 +39,14 @@ fun FinanceTextField(
             )
         }
     }
+    val placeholderContent: (@Composable () -> Unit)? = placeholder?.let { text ->
+        {
+            Text(
+                text = text,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -45,6 +54,7 @@ fun FinanceTextField(
         enabled = enabled,
         readOnly = readOnly,
         label = { Text(label) },
+        placeholder = placeholderContent,
         singleLine = singleLine,
         isError = isError,
         supportingText = supportingContent,

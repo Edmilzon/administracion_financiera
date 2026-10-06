@@ -4,10 +4,8 @@ import android.util.Patterns
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,6 +35,8 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceBottomSheet
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinancePasswordField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentOption
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentedSelector
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
 import com.moonspace.adminfinanciera.feature.auth.domain.AuthAccountMutation
@@ -332,7 +332,6 @@ private fun AccountProfileSheet(
             loadingLabel = stringResource(R.string.users_saving_profile)
         )
 
-        Spacer(Modifier.height(FinanceSpacing.Medium))
         Text(
             text = stringResource(R.string.users_change_password_title),
             style = MaterialTheme.typography.titleMedium,
@@ -589,29 +588,22 @@ private fun CreateMemberSheet(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = stringResource(R.string.users_role_label),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
+            FinanceSegmentedSelector(
+                label = stringResource(R.string.users_role_label),
+                options = listOf(
+                    FinanceSegmentOption(
+                        HouseholdRole.Member,
+                        stringResource(R.string.users_role_member)
+                    ),
+                    FinanceSegmentOption(
+                        HouseholdRole.Admin,
+                        stringResource(R.string.users_role_admin)
+                    )
+                ),
+                selectedValue = role,
+                onSelected = { role = it },
+                enabled = !isSubmitting
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-                FinanceButton(
-                    label = stringResource(R.string.users_role_member),
-                    onClick = { role = HouseholdRole.Member },
-                    modifier = Modifier.weight(1f),
-                    variant = if (role == HouseholdRole.Member) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary,
-                    enabled = !isSubmitting
-                )
-                FinanceButton(
-                    label = stringResource(R.string.users_role_admin),
-                    onClick = { role = HouseholdRole.Admin },
-                    modifier = Modifier.weight(1f),
-                    variant = if (role == HouseholdRole.Admin) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary,
-                    enabled = !isSubmitting
-                )
-            }
             errorMessage?.let { message ->
                 FinanceStatusBanner(message = message, tone = FinanceStatusTone.Error)
             }
@@ -645,25 +637,22 @@ private fun ChangeRoleSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(FinanceSpacing.Medium))
-        Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-            FinanceButton(
-                label = stringResource(R.string.users_role_member),
-                onClick = { role = HouseholdRole.Member },
-                modifier = Modifier.weight(1f),
-                variant = if (role == HouseholdRole.Member) FinanceButtonVariant.Primary
-                else FinanceButtonVariant.Secondary,
-                enabled = !isSubmitting
-            )
-            FinanceButton(
-                label = stringResource(R.string.users_role_admin),
-                onClick = { role = HouseholdRole.Admin },
-                modifier = Modifier.weight(1f),
-                variant = if (role == HouseholdRole.Admin) FinanceButtonVariant.Primary
-                else FinanceButtonVariant.Secondary,
-                enabled = !isSubmitting
-            )
-        }
+        FinanceSegmentedSelector(
+            label = stringResource(R.string.users_role_label),
+            options = listOf(
+                FinanceSegmentOption(
+                    HouseholdRole.Member,
+                    stringResource(R.string.users_role_member)
+                ),
+                FinanceSegmentOption(
+                    HouseholdRole.Admin,
+                    stringResource(R.string.users_role_admin)
+                )
+            ),
+            selectedValue = role,
+            onSelected = { role = it },
+            enabled = !isSubmitting
+        )
         Text(
             text = stringResource(
                 if (role == HouseholdRole.Admin) R.string.users_admin_permissions_note

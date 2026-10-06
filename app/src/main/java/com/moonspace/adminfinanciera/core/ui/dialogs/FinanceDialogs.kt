@@ -1,11 +1,10 @@
 package com.moonspace.adminfinanciera.core.ui.dialogs
 
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -157,7 +156,8 @@ fun FinanceBottomSheet(
                 .padding(horizontal = FinanceSpacing.Medium)
                 .padding(bottom = FinanceSpacing.Large)
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -171,7 +171,6 @@ fun FinanceBottomSheet(
                     variant = FinanceButtonVariant.Text
                 )
             }
-            Spacer(Modifier.height(FinanceSpacing.Medium))
             content()
         }
     }

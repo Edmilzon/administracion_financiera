@@ -1,7 +1,6 @@
 package com.moonspace.adminfinanciera.feature.budgets.presentation
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +47,8 @@ import com.moonspace.adminfinanciera.core.ui.components.FinanceStatusTone
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceBottomSheet
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceAmountField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceDropdownField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceDropdownOption
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.forms.parsePositiveAmountToCentavos
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSemanticColorScheme
@@ -459,20 +458,29 @@ private fun BudgetEditor(
     actionErrorMessage: String?,
     onSave: (BudgetDraft) -> Unit
 ) {
-    var categoryMenuOpen by remember { mutableStateOf(false) }
     val parsedAmount = remember(amount) { parsePositiveAmountToCentavos(amount) }
     val validAmount = parsedAmount?.takeIf { it <= MAX_BUDGET_LIMIT_CENTAVOS }
-    val selectedCategory = categories.firstOrNull { it.id == categoryId }
-    val categoryLabel = if (categoryId == null) {
-        stringResource(R.string.budgets_general_label)
-    } else {
-        selectedCategory?.let { category ->
-            val kindLabel = stringResource(
-                if (category.kind == TransactionKind.Income) R.string.transactions_income
-                else R.string.transactions_expense
+    val categoryOptions = buildList {
+        add(
+            FinanceDropdownOption<String?>(
+                value = null,
+                label = stringResource(R.string.budgets_general_label)
             )
-            "${category.name} · $kindLabel"
-        } ?: stringResource(R.string.budgets_choose_category)
+        )
+        categories
+            .filter { (it.isActive || it.id == categoryId) && (it.id !in existingCategoryIds || it.id == categoryId) }
+            .forEach { category ->
+                val kindLabel = stringResource(
+                    if (category.kind == TransactionKind.Income) R.string.transactions_income
+                    else R.string.transactions_expense
+                )
+                FinanceDropdownOption(
+                    value = category.id,
+                    label = category.name,
+                    supportingText = kindLabel,
+                    selectedLabel = "${category.name} · $kindLabel"
+                )
+            }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
@@ -481,42 +489,14 @@ private fun BudgetEditor(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(stringResource(R.string.budgets_scope_label), style = MaterialTheme.typography.labelLarge)
-        Box {
-            FinanceButton(
-                label = categoryLabel,
-                onClick = { categoryMenuOpen = true },
-                modifier = Modifier.fillMaxWidth(),
-                variant = FinanceButtonVariant.Secondary
-            )
-            DropdownMenu(
-                expanded = categoryMenuOpen,
-                onDismissRequest = { categoryMenuOpen = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.budgets_general_label)) },
-                    onClick = {
-                        onCategorySelected(null)
-                        categoryMenuOpen = false
-                    }
-                )
-                categories
-                    .filter { (it.isActive || it.id == categoryId) && (it.id !in existingCategoryIds || it.id == categoryId) }
-                    .forEach { category ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "${category.name} · ${stringResource(if (category.kind == TransactionKind.Income) R.string.transactions_income else R.string.transactions_expense)}"
-                            )
-                        },
-                        onClick = {
-                            onCategorySelected(category.id)
-                            categoryMenuOpen = false
-                        }
-                    )
-                }
-            }
-        }
+        FinanceDropdownField(
+            label = stringResource(R.string.budgets_scope_label),
+            options = categoryOptions,
+            selectedValue = categoryId,
+            placeholder = stringResource(R.string.budgets_choose_category),
+            onOptionSelected = onCategorySelected,
+            enabled = !isSubmitting
+        )
         FinanceAmountField(
             value = amount,
             onValueChange = onAmountChange,

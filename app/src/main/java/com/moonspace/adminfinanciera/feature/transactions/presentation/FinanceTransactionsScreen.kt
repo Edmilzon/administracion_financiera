@@ -1,7 +1,6 @@
 package com.moonspace.adminfinanciera.feature.transactions.presentation
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +46,10 @@ import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceDatePickerDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceAmountField
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceDateField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceDropdownField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceDropdownOption
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentOption
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentedSelector
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.forms.parsePositiveAmountToCentavos
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
@@ -449,7 +450,6 @@ private fun TransactionEditorSheet(
         mutableStateOf(initialTransaction?.description.orEmpty())
     }
     var isDatePickerOpen by remember { mutableStateOf(false) }
-    var isCategoryMenuOpen by remember { mutableStateOf(false) }
     val activeCategories = categories.filter { it.isActive && it.kind == kind }
     val selectedCategory = activeCategories.firstOrNull { it.id == categoryId }
     val parsedAmount = parsePositiveAmountToCentavos(amount)
@@ -462,27 +462,25 @@ private fun TransactionEditorSheet(
         onDismissRequest = onDismiss
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-            Text(stringResource(R.string.transactions_kind_label), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-                FinanceButton(
-                    label = stringResource(R.string.transactions_expense),
-                    onClick = {
-                        kind = TransactionKind.Expense
-                        categoryId = categories.firstOrNull { it.isActive && it.kind == TransactionKind.Expense }?.id.orEmpty()
-                    },
-                    variant = if (kind == TransactionKind.Expense) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary
-                )
-                FinanceButton(
-                    label = stringResource(R.string.transactions_income),
-                    onClick = {
-                        kind = TransactionKind.Income
-                        categoryId = categories.firstOrNull { it.isActive && it.kind == TransactionKind.Income }?.id.orEmpty()
-                    },
-                    variant = if (kind == TransactionKind.Income) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary
-                )
-            }
+            FinanceSegmentedSelector(
+                label = stringResource(R.string.transactions_kind_label),
+                options = listOf(
+                    FinanceSegmentOption(
+                        TransactionKind.Expense,
+                        stringResource(R.string.transactions_expense)
+                    ),
+                    FinanceSegmentOption(
+                        TransactionKind.Income,
+                        stringResource(R.string.transactions_income)
+                    )
+                ),
+                selectedValue = kind,
+                onSelected = { selectedKind ->
+                    kind = selectedKind
+                    categoryId = categories.firstOrNull { it.isActive && it.kind == selectedKind }?.id.orEmpty()
+                },
+                enabled = !isSubmitting
+            )
             if (initialTransaction == null) {
                 FinanceCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -525,40 +523,17 @@ private fun TransactionEditorSheet(
                         stringResource(R.string.transactions_invalid_amount)
                     } else null
                 )
-                Column(
+                FinanceDropdownField(
+                    label = stringResource(R.string.transactions_category_label),
+                    options = activeCategories.map { category ->
+                        FinanceDropdownOption(value = category.id, label = category.name)
+                    },
+                    selectedValue = categoryId.takeIf { it.isNotBlank() },
+                    placeholder = stringResource(R.string.transactions_choose_category),
+                    onOptionSelected = { categoryId = it },
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(FinanceSpacing.XSmall)
-                ) {
-                    Text(
-                        text = stringResource(R.string.transactions_category_label),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        FinanceButton(
-                            label = selectedCategory?.name
-                                ?: stringResource(R.string.transactions_choose_category),
-                            onClick = { isCategoryMenuOpen = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            variant = FinanceButtonVariant.Secondary,
-                            enabled = activeCategories.isNotEmpty(),
-                            compact = true
-                        )
-                        DropdownMenu(
-                            expanded = isCategoryMenuOpen,
-                            onDismissRequest = { isCategoryMenuOpen = false }
-                        ) {
-                            activeCategories.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category.name) },
-                                    onClick = {
-                                        categoryId = category.id
-                                        isCategoryMenuOpen = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
+                    enabled = !isSubmitting
+                )
             }
             FinanceTextField(
                 value = description,
@@ -726,21 +701,22 @@ private fun CategoryEditor(
             isError = name.length > 40
         )
         if (initialCategory == null) {
-            Text(stringResource(R.string.transactions_kind_label), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-                FinanceButton(
-                    label = stringResource(R.string.transactions_expense),
-                    onClick = { kind = TransactionKind.Expense },
-                    variant = if (kind == TransactionKind.Expense) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary
-                )
-                FinanceButton(
-                    label = stringResource(R.string.transactions_income),
-                    onClick = { kind = TransactionKind.Income },
-                    variant = if (kind == TransactionKind.Income) FinanceButtonVariant.Primary
-                    else FinanceButtonVariant.Secondary
-                )
-            }
+            FinanceSegmentedSelector(
+                label = stringResource(R.string.transactions_kind_label),
+                options = listOf(
+                    FinanceSegmentOption(
+                        TransactionKind.Expense,
+                        stringResource(R.string.transactions_expense)
+                    ),
+                    FinanceSegmentOption(
+                        TransactionKind.Income,
+                        stringResource(R.string.transactions_income)
+                    )
+                ),
+                selectedValue = kind,
+                onSelected = { kind = it },
+                enabled = !isSubmitting
+            )
         }
         FinanceButton(
             label = stringResource(R.string.categories_save),

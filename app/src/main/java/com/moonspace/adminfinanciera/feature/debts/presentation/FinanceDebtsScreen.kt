@@ -43,6 +43,8 @@ import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceConfirmDialog
 import com.moonspace.adminfinanciera.core.ui.dialogs.FinanceDatePickerDialog
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceAmountField
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceDateField
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentOption
+import com.moonspace.adminfinanciera.core.ui.forms.FinanceSegmentedSelector
 import com.moonspace.adminfinanciera.core.ui.forms.FinanceTextField
 import com.moonspace.adminfinanciera.core.ui.forms.parsePositiveAmountToCentavos
 import com.moonspace.adminfinanciera.core.ui.theme.FinanceSpacing
@@ -715,23 +717,22 @@ private fun DebtEditorContent(
     onSave: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.Medium)) {
-        Text(stringResource(R.string.debts_direction_label), style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-            FinanceButton(
-                label = stringResource(R.string.debts_owed_by_me),
-                onClick = { onDirectionChange(DebtDirection.OwedByMe) },
-                variant = if (direction == DebtDirection.OwedByMe) FinanceButtonVariant.Primary else FinanceButtonVariant.Secondary,
-                modifier = Modifier.weight(1f),
-                compact = true
-            )
-            FinanceButton(
-                label = stringResource(R.string.debts_owed_to_me),
-                onClick = { onDirectionChange(DebtDirection.OwedToMe) },
-                variant = if (direction == DebtDirection.OwedToMe) FinanceButtonVariant.Primary else FinanceButtonVariant.Secondary,
-                modifier = Modifier.weight(1f),
-                compact = true
-            )
-        }
+        FinanceSegmentedSelector(
+            label = stringResource(R.string.debts_direction_label),
+            options = listOf(
+                FinanceSegmentOption(
+                    DebtDirection.OwedByMe,
+                    stringResource(R.string.debts_owed_by_me)
+                ),
+                FinanceSegmentOption(
+                    DebtDirection.OwedToMe,
+                    stringResource(R.string.debts_owed_to_me)
+                )
+            ),
+            selectedValue = direction,
+            onSelected = onDirectionChange,
+            enabled = !isSubmitting
+        )
         FinanceTextField(
             value = counterparty,
             onValueChange = onCounterpartyChange,
