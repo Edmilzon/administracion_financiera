@@ -47,6 +47,7 @@ import com.moonspace.adminfinanciera.feature.reports.domain.ReportExportFormat
 import com.moonspace.adminfinanciera.feature.reports.domain.ReportFilterOption
 import com.moonspace.adminfinanciera.feature.reports.domain.ReportKindFilter
 import com.moonspace.adminfinanciera.feature.reports.presentation.components.ReportBreakdownCard
+import com.moonspace.adminfinanciera.feature.reports.presentation.components.ReportDeliverySheet
 import com.moonspace.adminfinanciera.feature.reports.presentation.components.ReportExportActions
 import com.moonspace.adminfinanciera.feature.reports.presentation.components.ReportFilterSelector
 import com.moonspace.adminfinanciera.feature.reports.presentation.components.ReportMovementCard
@@ -80,23 +81,16 @@ fun FinanceReportsScreen(
     var showingEndPicker by remember { mutableStateOf(false) }
     var deliveryMessage by remember { mutableStateOf<String?>(null) }
     var deliveryError by remember { mutableStateOf(false) }
-    var pendingPdfShareVersion by remember { mutableStateOf<Int?>(null) }
+    var isDeliverySheetOpen by remember { mutableStateOf(false) }
+    var observedGeneratedFileVersion by remember { mutableStateOf(state.generatedFileVersion) }
 
     val generatedFile = state.generatedFile
-    LaunchedEffect(state.generatedFileVersion, state.actionErrorMessage) {
-        val requestedVersion = pendingPdfShareVersion ?: return@LaunchedEffect
-        if (state.generatedFileVersion >= requestedVersion) {
-            val pdf = state.generatedFile?.takeIf { it.format == ReportExportFormat.Pdf }
-            pendingPdfShareVersion = null
-            if (pdf != null) {
-                deliveryMessage = null
-                shareGeneratedFile(context, pdf, onDeliveryFailed) { message ->
-                    deliveryMessage = message
-                    deliveryError = true
-                }
+    LaunchedEffect(state.generatedFileVersion) {
+        if (state.generatedFileVersion != observedGeneratedFileVersion) {
+            observedGeneratedFileVersion = state.generatedFileVersion
+            if (generatedFile != null) {
+                isDeliverySheetOpen = true
             }
-        } else if (state.actionErrorMessage != null && !state.isGenerating) {
-            pendingPdfShareVersion = null
         }
     }
     val savePdfLauncher = rememberLauncherForActivityResult(
@@ -142,6 +136,31 @@ fun FinanceReportsScreen(
                 }
             )
         }
+    }
+    val saveReport: (GeneratedFinanceReport) -> Unit = { reportFile ->
+        isDeliverySheetOpen = false
+        deliveryMessage = null
+        when (reportFile.format) {
+            ReportExportFormat.Pdf -> savePdfLauncher.launch(reportFile.fileName)
+            ReportExportFormat.Excel -> saveExcelLauncher.launch(reportFile.fileName)
+        }
+    }
+    val shareReport: (GeneratedFinanceReport) -> Unit = { reportFile ->
+        isDeliverySheetOpen = false
+        deliveryMessage = null
+        shareGeneratedFile(context, reportFile, onDeliveryFailed) { message ->
+            deliveryMessage = message
+            deliveryError = true
+        }
+    }
+
+    if (isDeliverySheetOpen && generatedFile != null) {
+        ReportDeliverySheet(
+            report = generatedFile,
+            onDismissRequest = { isDeliverySheetOpen = false },
+            onSave = { saveReport(generatedFile) },
+            onShare = { shareReport(generatedFile) }
+        )
     }
 
     if (showingStartPicker) {
@@ -222,29 +241,9 @@ fun FinanceReportsScreen(
                     onResetFilters()
                 },
                 onGenerate = { format ->
-                    if (format == ReportExportFormat.Pdf) {
-                        pendingPdfShareVersion = state.generatedFileVersion + 1
-                    }
                     onGenerate(format)
                 },
-                onSave = {
-                    state.generatedFile?.let { currentFile ->
-                        deliveryMessage = null
-                        when (currentFile.format) {
-                            ReportExportFormat.Pdf -> savePdfLauncher.launch(currentFile.fileName)
-                            ReportExportFormat.Excel -> saveExcelLauncher.launch(currentFile.fileName)
-                        }
-                    }
-                },
-                onShare = {
-                    state.generatedFile?.let { reportFile ->
-                        deliveryMessage = null
-                        shareGeneratedFile(context, reportFile, onDeliveryFailed) { message ->
-                            deliveryMessage = message
-                            deliveryError = true
-                        }
-                    }
-                },
+                onOpenDeliveryOptions = { isDeliverySheetOpen = true },
                 onPrint = {
                     state.generatedFile?.takeIf { it.format == ReportExportFormat.Pdf }?.let { reportFile ->
                         runCatching { printGeneratedPdf(context, reportFile) }
@@ -271,8 +270,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.reportItems(
     onSelectMember: (String?) -> Unit,
     onResetFilters: () -> Unit,
     onGenerate: (ReportExportFormat) -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit,
+    onOpenDeliveryOptions: () -> Unit,
     onPrint: () -> Unit
 ) {
     item {
@@ -281,8 +279,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.reportItems(
             generatedFile = state.generatedFile,
             onGeneratePdf = { onGenerate(ReportExportFormat.Pdf) },
             onGenerateExcel = { onGenerate(ReportExportFormat.Excel) },
-            onSave = onSave,
-            onShare = onShare,
+            onOpenDeliveryOptions = onOpenDeliveryOptions,
             onPrint = onPrint
         )
     }

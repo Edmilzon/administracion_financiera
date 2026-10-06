@@ -24,8 +24,7 @@ fun ReportExportActions(
     generatedFile: GeneratedFinanceReport?,
     onGeneratePdf: () -> Unit,
     onGenerateExcel: () -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit,
+    onOpenDeliveryOptions: () -> Unit,
     onPrint: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -41,49 +40,39 @@ fun ReportExportActions(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (generatedFile == null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-                    FinanceButton(
-                        label = stringResource(R.string.reports_generate_pdf),
-                        onClick = onGeneratePdf,
-                        modifier = Modifier.weight(1f),
-                        enabled = !isGenerating,
-                        isLoading = isGenerating,
-                        loadingLabel = stringResource(R.string.reports_generating),
-                        variant = FinanceButtonVariant.Primary,
-                        compact = true
-                    )
-                    FinanceButton(
-                        label = stringResource(R.string.reports_generate_excel),
-                        onClick = onGenerateExcel,
-                        modifier = Modifier.weight(1f),
-                        enabled = !isGenerating,
-                        variant = FinanceButtonVariant.Secondary,
-                        compact = true
-                    )
-                }
-            } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
+                FinanceButton(
+                    label = stringResource(R.string.reports_generate_pdf),
+                    onClick = onGeneratePdf,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isGenerating,
+                    isLoading = isGenerating,
+                    loadingLabel = stringResource(R.string.reports_generating),
+                    variant = FinanceButtonVariant.Primary,
+                    compact = true
+                )
+                FinanceButton(
+                    label = stringResource(R.string.reports_generate_excel),
+                    onClick = onGenerateExcel,
+                    modifier = Modifier.weight(1f),
+                    enabled = !isGenerating,
+                    variant = FinanceButtonVariant.Secondary,
+                    compact = true
+                )
+            }
+            if (generatedFile != null) {
                 Text(
                     text = stringResource(R.string.reports_file_ready, generatedFile.fileName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small)) {
-                    FinanceButton(
-                        label = stringResource(R.string.reports_save_file),
-                        onClick = onSave,
-                        modifier = Modifier.weight(1f),
-                        variant = FinanceButtonVariant.Primary,
-                        compact = true
-                    )
-                    FinanceButton(
-                        label = stringResource(R.string.reports_share_file),
-                        onClick = onShare,
-                        modifier = Modifier.weight(1f),
-                        variant = FinanceButtonVariant.Secondary,
-                        compact = true
-                    )
-                }
+                FinanceButton(
+                    label = stringResource(R.string.reports_save_or_share),
+                    onClick = onOpenDeliveryOptions,
+                    modifier = Modifier.fillMaxWidth(),
+                    variant = FinanceButtonVariant.Primary,
+                    compact = true
+                )
                 if (generatedFile.format == ReportExportFormat.Pdf) {
                     FinanceButton(
                         label = stringResource(R.string.reports_print_file),

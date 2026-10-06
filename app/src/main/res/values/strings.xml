@@ -386,6 +386,9 @@
     <string name="reports_generate_excel">Generar Excel</string>
     <string name="reports_generating">Generando archivo…</string>
     <string name="reports_file_ready">Archivo listo: %1$s</string>
+    <string name="reports_delivery_title">Guardar o compartir</string>
+    <string name="reports_delivery_message">¿Qué quieres hacer con %1$s?</string>
+    <string name="reports_save_or_share">Guardar o compartir</string>
     <string name="reports_save_file">Guardar archivo</string>
     <string name="reports_share_file">Compartir archivo</string>
     <string name="reports_print_file">Imprimir PDF</string>

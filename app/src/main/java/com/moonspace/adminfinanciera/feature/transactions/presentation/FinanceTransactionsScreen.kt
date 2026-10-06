@@ -512,17 +512,6 @@ private fun TransactionEditorSheet(
                 horizontalArrangement = Arrangement.spacedBy(FinanceSpacing.Small),
                 verticalAlignment = Alignment.Top
             ) {
-                FinanceAmountField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    label = stringResource(R.string.transactions_amount_label),
-                    currencyLabel = stringResource(R.string.transactions_currency),
-                    modifier = Modifier.weight(1f),
-                    isError = amount.isNotBlank() && parsedAmount == null,
-                    supportingText = if (amount.isNotBlank() && parsedAmount == null) {
-                        stringResource(R.string.transactions_invalid_amount)
-                    } else null
-                )
                 FinanceDropdownField(
                     label = stringResource(R.string.transactions_category_label),
                     options = activeCategories.map { category ->
@@ -533,6 +522,17 @@ private fun TransactionEditorSheet(
                     onOptionSelected = { categoryId = it },
                     modifier = Modifier.weight(1f),
                     enabled = !isSubmitting
+                )
+                FinanceAmountField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = stringResource(R.string.transactions_amount_label),
+                    currencyLabel = stringResource(R.string.transactions_currency),
+                    modifier = Modifier.weight(1f),
+                    isError = amount.isNotBlank() && parsedAmount == null,
+                    supportingText = if (amount.isNotBlank() && parsedAmount == null) {
+                        stringResource(R.string.transactions_invalid_amount)
+                    } else null
                 )
             }
             FinanceTextField(
